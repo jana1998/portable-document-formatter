@@ -1,7 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Bundle the worker with the renderer so packaged Electron builds do not rely on a CDN.
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export class PDFRenderer {
   private pdfDocument: pdfjsLib.PDFDocumentProxy | null = null;
@@ -118,7 +119,7 @@ export class PDFRenderer {
 
         while ((match = regex.exec(item.str)) !== null) {
           // Get position from transform matrix
-          const transform = item.transform;
+          const transform = Array.isArray(item.transform) ? item.transform : [1, 0, 0, 1, 0, 0];
           const x = transform[4];
           const y = viewport.height - transform[5]; // Flip Y coordinate
 

@@ -1,6 +1,7 @@
 {
   "name": "portable-document-formatter",
   "version": "1.0.0",
+  "productName": "Portable Document Formatter",
   "description": "Production-ready Electron desktop application for PDF manipulation",
   "main": "dist/main/main.js",
   "author": "Your Name",
@@ -19,7 +20,11 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
+    "dist:mac": "npm run build && electron-builder --mac dmg --universal -c.mac.identity=-",
+    "dist:mac:signed": "npm run build && electron-builder --mac dmg --universal",
+    "dist:win": "npm run build && electron-builder --win nsis --x64",
+    "dist:win:signed": "npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",
@@ -69,6 +74,72 @@
     "vite": "^5.0.8",
     "vite-plugin-electron": "^0.28.0",
     "vitest": "^1.0.4",
+    "electron-builder": "^24.13.3",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.portabledocumentformatter.app",
+    "productName": "Portable Document Formatter",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!node_modules/canvas{,/**/*}",
+      "!src/**/*",
+      "!dist/**/*.map"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "sign": false,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 190
+        },
+        {
+          "x": 400,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
   }
 }

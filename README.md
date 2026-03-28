@@ -49,7 +49,6 @@ Present in code but not fully productized:
 
 - Page-management operations exist in the main process and a `PageManagement` dialog component exists, but it is not integrated into the main toolbar flow.
 - `exportToImage` and `extractText` IPC endpoints are stubbed and currently throw.
-- The PDF.js worker is loaded from a CDN, so offline or restricted-network environments may need a local worker setup.
 
 ## Quick Start
 
@@ -76,6 +75,34 @@ This starts Vite, builds the Electron main process, waits for the renderer to co
 
 ```bash
 npm run build
+```
+
+### Build A macOS DMG
+
+```bash
+npm run dist:mac
+```
+
+This writes a universal macOS installer DMG to `release/Portable Document Formatter-<version>-universal.dmg`.
+
+For a signed build using your Apple Developer credentials:
+
+```bash
+npm run dist:mac:signed
+```
+
+### Build A Windows EXE
+
+```bash
+npm run dist:win
+```
+
+This writes a Windows NSIS installer EXE to `release/Portable Document Formatter-Setup-<version>.exe`.
+
+If you want a signed Windows installer, use the same command pattern after configuring your Windows code-signing certificate:
+
+```bash
+npm run dist:win:signed
 ```
 
 ### Test
@@ -149,6 +176,18 @@ src/
 
 - Multi-page OCR is sequential by design.
 - Expect several seconds per page on larger or image-heavy documents.
+
+### DMG opens with a macOS warning on another computer
+
+- The default `npm run dist:mac` build is ad-hoc signed so it can be packaged without Apple certificates.
+- On another Mac, the user may need to right-click the app and choose `Open` the first time.
+- For smoother distribution without Gatekeeper warnings, use `npm run dist:mac:signed` with Developer ID signing and notarization credentials configured.
+
+### EXE shows a Windows SmartScreen warning
+
+- The default `npm run dist:win` build is unsigned.
+- Windows may show a SmartScreen prompt on another computer until the installer is code signed.
+- For smoother distribution, configure a Windows signing certificate before using the signed build flow.
 
 ## Notes From The Consolidated Docs
 
