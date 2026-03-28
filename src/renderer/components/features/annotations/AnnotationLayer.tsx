@@ -1,0 +1,221 @@
+import React, { useRef, useEffect, useState } from 'react';
+import { usePDFStore } from '@renderer/store/usePDFStore';
+import type { Annotation } from '@renderer/types';
+import { annotationService } from '@/services/annotation-service';
+
+interface AnnotationLayerProps {
+  pageNumber: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  scale: number;
+}
+
+export function AnnotationLayer({
+  pageNumber,
+  canvasWidth,
+  canvasHeight,
+  scale,
+}: AnnotationLayerProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { annotations, currentTool, addAnnotation, selectedAnnotationId, setSelectedAnnotationId } = usePDFStore();
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [currentShape, setCurrentShape] = useState<any>(null);
+
+  const pageAnnotations = annotations.get(pageNumber) || [];
+
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (currentTool === 'select') return;
+
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setIsDrawing(true);
+    setStartPoint({ x, y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isDrawing || !startPoint) return;
+
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setCurrentShape({
+      x: Math.min(startPoint.x, x),
+      y: Math.min(startPoint.y, y),
+      width: Math.abs(x - startPoint.x),
+      height: Math.abs(y - startPoint.y),
+    });
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!isDrawing || !startPoint || !currentShape) return;
+
+    const annotation = annotationService.createAnnotation(
+      pageNumber,
+      currentTool as any,
+      {
+        x: currentShape.x / scale,
+        y: currentShape.y / scale,
+        width: currentShape.width / scale,
+        height: currentShape.height / scale,
+      },
+      getColorForTool(currentTool)
+    );
+
+    addAnnotation(annotation);
+
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentShape(null);
+  };
+
+  const getColorForTool = (tool: string): string => {
+    switch (tool) {
+      case 'highlight':
+        return '#FFFF00';
+      case 'underline':
+        return '#FF0000';
+      case 'strikethrough':
+        return '#FF0000';
+      case 'rectangle':
+        return '#0000FF';
+      case 'circle':
+        return '#00FF00';
+      default:
+        return '#FFFF00';
+    }
+  };
+
+  const renderAnnotation = (annotation: Annotation) => {
+    const { data, color, type, id } = annotation;
+    const x = data.x * scale;
+    const y = data.y * scale;
+    const width = data.width * scale;
+    const height = data.height * scale;
+    const isSelected = id === selectedAnnotationId;
+
+    const commonProps = {
+      onClick: () => setSelectedAnnotationId(id),
+      style: {
+        cursor: 'pointer',
+        stroke: isSelected ? '#000' : 'transparent',
+        strokeWidth: isSelected ? 2 : 0,
+      },
+    };
+
+    switch (type) {
+      case 'highlight':
+        return (
+          <rect
+            key={id}
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            fill={color}
+            fillOpacity={0.3}
+            {...commonProps}
+          />
+        );
+      case 'rectangle':
+        return (
+          <rect
+            key={id}
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            fill="none"
+            stroke={color}
+            strokeWidth={2}
+            {...commonProps}
+          />
+        );
+      case 'circle':
+        return (
+          <ellipse
+            key={id}
+            cx={x + width / 2}
+            cy={y + height / 2}
+            rx={width / 2}
+            ry={height / 2}
+            fill="none"
+            stroke={color}
+            strokeWidth={2}
+            {...commonProps}
+          />
+        );
+      case 'underline':
+        return (
+          <line
+            key={id}
+            x1={x}
+            y1={y + height}
+            x2={x + width}
+            y2={y + height}
+            stroke={color}
+            strokeWidth={2}
+            {...commonProps}
+          />
+        );
+      case 'strikethrough':
+        return (
+          <line
+            key={id}
+            x1={x}
+            y1={y + height / 2}
+            x2={x + width}
+            y2={y + height / 2}
+            stroke={color}
+            strokeWidth={2}
+            {...commonProps}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <svg
+      ref={svgRef}
+      className="annotation-layer absolute top-0 left-0"
+      width={canvasWidth}
+      height={canvasHeight}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      style={{ pointerEvents: currentTool !== 'select' ? 'auto' : 'auto' }}
+    >
+      {pageAnnotations.map(renderAnnotation)}
+      {isDrawing && currentShape && currentTool === 'highlight' && (
+        <rect
+          x={currentShape.x}
+          y={currentShape.y}
+          width={currentShape.width}
+          height={currentShape.height}
+          fill="#FFFF00"
+          fillOpacity={0.3}
+        />
+      )}
+      {isDrawing && currentShape && currentTool === 'rectangle' && (
+        <rect
+          x={currentShape.x}
+          y={currentShape.y}
+          width={currentShape.width}
+          height={currentShape.height}
+          fill="none"
+          stroke="#0000FF"
+          strokeWidth={2}
+        />
+      )}
+    </svg>
+  );
+}
