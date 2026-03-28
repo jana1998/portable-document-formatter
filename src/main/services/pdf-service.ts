@@ -98,6 +98,24 @@ export class PDFService {
     }
   }
 
+  async reorderPages(filePath: string, newPageOrder: number[], outputPath: string): Promise<void> {
+    try {
+      const pdfBytes = await fs.readFile(filePath);
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const newPdf = await PDFDocument.create();
+
+      // Copy pages in the new order (convert to 0-based indices)
+      const pageIndices = newPageOrder.map((num) => num - 1);
+      const copiedPages = await newPdf.copyPages(pdfDoc, pageIndices);
+      copiedPages.forEach((page) => newPdf.addPage(page));
+
+      const newPdfBytes = await newPdf.save();
+      await fs.writeFile(outputPath, newPdfBytes);
+    } catch (error) {
+      throw new Error(`Failed to reorder pages: ${error}`);
+    }
+  }
+
   async rotatePage(filePath: string, pageNumber: number, rotation: number, outputPath: string): Promise<void> {
     try {
       const pdfBytes = await fs.readFile(filePath);
@@ -323,6 +341,115 @@ export class PDFService {
                 end: { x: annotation.data.x + annotation.data.width, y: pageHeight - annotation.data.y - annotation.data.height / 2 },
                 color: rgb(color.r, color.g, color.b),
                 thickness: 2,
+              });
+              break;
+
+            case 'line':
+              page.drawLine({
+                start: { x: annotation.data.x, y: pageHeight - annotation.data.y },
+                end: { x: annotation.data.x + annotation.data.width, y: pageHeight - annotation.data.y - annotation.data.height },
+                color: rgb(color.r, color.g, color.b),
+                thickness: 2,
+              });
+              break;
+
+            case 'arrow': {
+              const startX = annotation.data.x;
+              const startY = pageHeight - annotation.data.y;
+              const endX = annotation.data.endX || annotation.data.x + annotation.data.width;
+              const endY = pageHeight - (annotation.data.endY || annotation.data.y + annotation.data.height);
+
+              // Draw arrow shaft
+              page.drawLine({
+                start: { x: startX, y: startY },
+                end: { x: endX, y: endY },
+                color: rgb(color.r, color.g, color.b),
+                thickness: 2,
+              });
+
+              // Draw arrow head
+              const angle = Math.atan2(endY - startY, endX - startX);
+              const arrowHeadLength = 10;
+
+              page.drawLine({
+                start: { x: endX, y: endY },
+                end: {
+                  x: endX - arrowHeadLength * Math.cos(angle - Math.PI / 6),
+                  y: endY - arrowHeadLength * Math.sin(angle - Math.PI / 6)
+                },
+                color: rgb(color.r, color.g, color.b),
+                thickness: 2,
+              });
+
+              page.drawLine({
+                start: { x: endX, y: endY },
+                end: {
+                  x: endX - arrowHeadLength * Math.cos(angle + Math.PI / 6),
+                  y: endY - arrowHeadLength * Math.sin(angle + Math.PI / 6)
+                },
+                color: rgb(color.r, color.g, color.b),
+                thickness: 2,
+              });
+              break;
+            }
+
+            case 'freehand':
+              if (annotation.data.points && annotation.data.points.length > 1) {
+                for (let i = 0; i < annotation.data.points.length - 1; i++) {
+                  const point1 = annotation.data.points[i];
+                  const point2 = annotation.data.points[i + 1];
+                  page.drawLine({
+                    start: { x: point1.x, y: pageHeight - point1.y },
+                    end: { x: point2.x, y: pageHeight - point2.y },
+                    color: rgb(color.r, color.g, color.b),
+                    thickness: 2,
+                  });
+                }
+              }
+              break;
+
+            case 'note':
+              // Draw note as a filled rectangle with text
+              page.drawRectangle({
+                x: annotation.data.x,
+                y: pageHeight - annotation.data.y - annotation.data.height,
+                width: annotation.data.width,
+                height: annotation.data.height,
+                color: rgb(0.99, 0.82, 0.30), // Yellow
+                opacity: 0.9,
+                borderColor: rgb(color.r, color.g, color.b),
+                borderWidth: 1,
+              });
+              if (annotation.data.text) {
+                page.drawText('Note', {
+                  x: annotation.data.x + 5,
+                  y: pageHeight - annotation.data.y - 15,
+                  size: 10,
+                  font,
+                  color: rgb(0.2, 0.2, 0.2),
+                });
+              }
+              break;
+
+            case 'stamp':
+              // Draw stamp with border and text
+              page.drawRectangle({
+                x: annotation.data.x,
+                y: pageHeight - annotation.data.y - annotation.data.height,
+                width: annotation.data.width,
+                height: annotation.data.height,
+                borderColor: rgb(color.r, color.g, color.b),
+                borderWidth: 3,
+              });
+
+              const stampText = (annotation.data.stampType || 'stamp').toUpperCase();
+              page.drawText(stampText, {
+                x: annotation.data.x + annotation.data.width / 2 - (stampText.length * 3),
+                y: pageHeight - annotation.data.y - annotation.data.height / 2 - 5,
+                size: 12,
+                font,
+                color: rgb(color.r, color.g, color.b),
+                rotate: degrees(-15),
               });
               break;
           }

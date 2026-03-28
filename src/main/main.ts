@@ -117,6 +117,10 @@ function setupIPCHandlers() {
     return pdfService.extractPages(filePath, pageNumbers, outputPath);
   });
 
+  ipcMain.handle('pdf:reorderPages', async (_, filePath: string, newPageOrder: number[], outputPath: string) => {
+    return pdfService.reorderPages(filePath, newPageOrder, outputPath);
+  });
+
   ipcMain.handle('pdf:rotatePage', async (_, filePath: string, pageNumber: number, rotation: number, outputPath: string) => {
     return pdfService.rotatePage(filePath, pageNumber, rotation, outputPath);
   });

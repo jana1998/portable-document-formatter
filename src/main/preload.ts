@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   splitPDF: (filePath: string, pageRanges: number[][], outputDir: string) => ipcRenderer.invoke('pdf:splitPDF', filePath, pageRanges, outputDir),
   deletePage: (filePath: string, pageNumber: number, outputPath: string) => ipcRenderer.invoke('pdf:deletePage', filePath, pageNumber, outputPath),
   extractPages: (filePath: string, pageNumbers: number[], outputPath: string) => ipcRenderer.invoke('pdf:extractPages', filePath, pageNumbers, outputPath),
+  reorderPages: (filePath: string, newPageOrder: number[], outputPath: string) => ipcRenderer.invoke('pdf:reorderPages', filePath, newPageOrder, outputPath),
   rotatePage: (filePath: string, pageNumber: number, rotation: number, outputPath: string) => ipcRenderer.invoke('pdf:rotatePage', filePath, pageNumber, rotation, outputPath),
   addTextToPDF: (filePath: string, pageNumber: number, text: string, x: number, y: number, options: any, outputPath: string) => ipcRenderer.invoke('pdf:addTextToPDF', filePath, pageNumber, text, x, y, options, outputPath),
   addImageToPDF: (filePath: string, pageNumber: number, imageData: string, x: number, y: number, width: number, height: number, outputPath: string) => ipcRenderer.invoke('pdf:addImageToPDF', filePath, pageNumber, imageData, x, y, width, height, outputPath),
@@ -41,6 +42,7 @@ declare global {
       splitPDF: (filePath: string, pageRanges: number[][], outputDir: string) => Promise<string[]>;
       deletePage: (filePath: string, pageNumber: number, outputPath: string) => Promise<void>;
       extractPages: (filePath: string, pageNumbers: number[], outputPath: string) => Promise<void>;
+      reorderPages: (filePath: string, newPageOrder: number[], outputPath: string) => Promise<void>;
       rotatePage: (filePath: string, pageNumber: number, rotation: number, outputPath: string) => Promise<void>;
       addTextToPDF: (filePath: string, pageNumber: number, text: string, x: number, y: number, options: any, outputPath: string) => Promise<void>;
       addImageToPDF: (filePath: string, pageNumber: number, imageData: string, x: number, y: number, width: number, height: number, outputPath: string) => Promise<void>;

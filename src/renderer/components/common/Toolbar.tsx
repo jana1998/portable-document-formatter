@@ -3,20 +3,27 @@ import { Button } from '@components/ui/button';
 import { Slider } from '@components/ui/slider';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@components/ui/tooltip';
 import {
+  ArrowRight,
   ChevronLeft,
   ChevronRight,
+  Circle,
   FileText,
   FileUp,
   Highlighter,
   Image as ImageIcon,
+  MessageSquare,
+  Minus,
   Moon,
   PanelLeft,
   PanelLeftClose,
+  Pencil,
   Pointer,
   RotateCw,
   Save,
   ScanText,
   Search,
+  Square,
+  Stamp,
   Sun,
   Type,
   ZoomIn,
@@ -32,6 +39,16 @@ const toolOptions = [
   { id: 'highlight', label: 'Highlight', icon: Highlighter },
   { id: 'text', label: 'Text', icon: Type },
   { id: 'image', label: 'Image', icon: ImageIcon },
+] as const;
+
+const annotationTools = [
+  { id: 'rectangle', label: 'Rectangle', icon: Square },
+  { id: 'circle', label: 'Circle', icon: Circle },
+  { id: 'arrow', label: 'Arrow', icon: ArrowRight },
+  { id: 'line', label: 'Line', icon: Minus },
+  { id: 'freehand', label: 'Draw', icon: Pencil },
+  { id: 'note', label: 'Note', icon: MessageSquare },
+  { id: 'stamp', label: 'Stamp', icon: Stamp },
 ] as const;
 
 export function Toolbar() {
@@ -230,6 +247,24 @@ export function Toolbar() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
                 {toolOptions.map(({ id, label, icon: Icon }) => (
+                  <ToolbarButton key={id} label={label}>
+                    <Button
+                      variant={currentTool === id ? 'default' : 'toolbar'}
+                      size="icon"
+                      onClick={() => setCurrentTool(id)}
+                      className={cn(
+                        currentTool === id && 'shadow-[0_10px_24px_rgba(13,148,136,0.2)]'
+                      )}
+                      aria-label={label}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  </ToolbarButton>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+                {annotationTools.map(({ id, label, icon: Icon }) => (
                   <ToolbarButton key={id} label={label}>
                     <Button
                       variant={currentTool === id ? 'default' : 'toolbar'}

@@ -32,9 +32,12 @@ export type AnnotationType =
   | 'rectangle'
   | 'circle'
   | 'line'
+  | 'arrow'
   | 'freehand'
   | 'text'
-  | 'comment';
+  | 'comment'
+  | 'note'
+  | 'stamp';
 
 export interface AnnotationData {
   x: number;
@@ -44,7 +47,19 @@ export interface AnnotationData {
   points?: Point[];
   text?: string;
   comment?: string;
+  stampType?: StampType;
+  noteColor?: string;
 }
+
+export type StampType =
+  | 'approved'
+  | 'rejected'
+  | 'confidential'
+  | 'draft'
+  | 'final'
+  | 'reviewed'
+  | 'urgent'
+  | 'completed';
 
 export interface Point {
   x: number;

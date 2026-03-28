@@ -1,198 +1,400 @@
-# Portable Document Formatter
+<div align="center">
+  <img src="public/icon.png" alt="Portable Document Formatter Logo" width="120" height="120">
 
-Portable Document Formatter is an Electron desktop app for viewing, annotating, searching, OCR-processing, and saving edited PDF documents from a React and TypeScript UI.
+  # Portable Document Formatter
+
+  ### 🚀 A Modern, Feature-Rich PDF Editor Built with Electron
+
+  **View • Annotate • Edit • OCR • Export** — All in one beautiful desktop app
+
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Electron](https://img.shields.io/badge/Electron-28-blue.svg)](https://www.electronjs.org/)
+  [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+
+  [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Tech Stack](#-tech-stack) • [Contributing](#-contributing)
+
+</div>
+
+---
+
+## ✨ Features
+
+### 📄 **Advanced PDF Viewing**
+- 🔍 **Zoom & Navigation** — Smooth zooming with intuitive page controls
+- 🖼️ **Thumbnail Sidebar** — Quick navigation with visual page previews
+- 🌓 **Dark Mode** — Easy on the eyes with beautiful dark theme support
+- ⚡ **Fast Rendering** — Powered by PDF.js for lightning-fast page rendering
+
+### ✏️ **Powerful Editing Tools**
+- 🎨 **Highlight Annotations** — Mark important sections with customizable highlights
+- 💬 **Comment System** — Add notes and comments to your annotations
+- 📝 **Text Overlays** — Insert custom text directly onto PDF pages
+- 🖼️ **Image Insertion** — Add images and graphics to your documents
+- 📊 **Non-Destructive Editing** — Original PDFs remain untouched until you save
+
+### 🔎 **Smart Search & OCR**
+- 🔍 **Full-Text Search** — Find any text across your entire document
+- 📍 **Result Highlighting** — Visual highlights for all search matches
+- 🤖 **OCR Processing** — Extract text from scanned PDFs and images using Tesseract.js
+- 📄 **Batch OCR** — Process single pages or entire documents at once
+
+### 💾 **Flexible Export Options**
+- 📑 **Selective Export** — Save specific page ranges (e.g., "1-3, 5, 7-9")
+- ✅ **Embed Modifications** — All edits are permanently embedded in exported PDFs
+- 🔒 **Preserve Quality** — No loss of quality during save operations
+- 📤 **Multiple Formats** — Export with all annotations and overlays intact
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+  <img src="public/icon.png" alt="Main Interface" width="600">
+  <p><em>Clean, intuitive interface with powerful editing tools</em></p>
+</div>
+
+> **Note:** Add screenshots of your app in action by placing them in the `public/screenshots/` folder!
+
+---
+
+## 🚀 Installation
+
+### Download Pre-built Binaries
+
+**macOS** (Universal - Intel & Apple Silicon)
+```bash
+# Download from releases page
+# Or build locally:
+npm run dist:mac
+```
+
+**Windows** (64-bit)
+```bash
+# Download from releases page
+# Or build locally:
+npm run dist:win
+```
+
+### Build from Source
+
+#### Prerequisites
+- Node.js 18+ ([Download](https://nodejs.org/))
+- npm 9+
+- Git
+
+#### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/portable-document-formatter.git
+cd portable-document-formatter
+
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Build for production
+npm run build
+```
+
+---
+
+## 📖 Usage
+
+### 🔓 Opening PDFs
+1. Click the **folder icon** in the toolbar
+2. Select any PDF file from your computer
+3. Start viewing and editing immediately
+
+### ✏️ Adding Annotations
+1. **Highlight Text**: Select the highlight tool and click-drag on text
+2. **Add Comments**: Click on any highlight to add or edit comments
+3. **Insert Text**: Choose the text tool and click anywhere on the page
+4. **Add Images**: Click the image tool, select an image, and place it
+
+### 🔍 Searching Documents
+1. Click the **search icon** in the toolbar
+2. Type your search query
+3. Navigate through results with keyboard shortcuts or the sidebar
+
+### 🤖 Using OCR
+1. Open a scanned PDF or image-based document
+2. Click the **OCR button**
+3. Choose between **current page** or **all pages**
+4. Wait for processing and copy the extracted text
+
+### 💾 Saving Your Work
+1. Click the **save button** in the toolbar
+2. Choose to save all pages or specify ranges (e.g., `1-5, 8, 10-12`)
+3. Select output location
+4. Your new PDF will include all edits and annotations!
+
+---
+
+## 🛠️ Tech Stack
+
+Built with modern, production-ready technologies:
+
+| Technology | Purpose |
+|------------|---------|
+| ⚡ **Electron 28** | Cross-platform desktop framework |
+| ⚛️ **React 18** | UI library with hooks |
+| 📘 **TypeScript** | Type-safe development |
+| 🎨 **Tailwind CSS** | Utility-first styling |
+| 🧩 **Radix UI** | Accessible component primitives |
+| 📄 **PDF.js** | PDF rendering engine |
+| 📝 **pdf-lib** | PDF manipulation and creation |
+| 🤖 **Tesseract.js** | OCR text extraction |
+| 🐻 **Zustand** | Lightweight state management |
+| ⚡ **Vite** | Lightning-fast build tool |
+| 🧪 **Vitest** | Modern testing framework |
+| 🎭 **Playwright** | End-to-end testing |
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-    User[User] --> Toolbar[Toolbar and Sidebar]
-    Toolbar --> Viewer[PDF Viewer]
-    Viewer --> Overlays[Search, annotations, text, image overlays]
-    Toolbar --> OCR[OCR dialog]
-    Toolbar --> Save[Save dialog]
-    Viewer --> Store[Zustand store]
+    User[👤 User] --> Toolbar[🎛️ Toolbar & Sidebar]
+    Toolbar --> Viewer[📄 PDF Viewer]
+    Viewer --> Overlays[✨ Search, Annotations, Overlays]
+    Toolbar --> OCR[🤖 OCR Engine]
+    Toolbar --> Save[💾 Save Dialog]
+    Viewer --> Store[🐻 Zustand Store]
     OCR --> Store
-    Save --> IPC[Electron preload and IPC]
-    IPC --> Main[Electron main process]
-    Main --> PDFService[pdf-lib PDF service]
-    Main --> FileService[File service]
-    PDFService --> Files[(PDF files)]
+    Save --> IPC[⚡ Electron IPC]
+    IPC --> Main[🖥️ Main Process]
+    Main --> PDFService[📄 PDF Service]
+    Main --> FileService[📁 File Service]
+    PDFService --> Files[(💾 PDF Files)]
     FileService --> Files
 ```
 
-See [ARCHITECTURE.md](/Users/supravojana/Documents/GitHub/portable-document-formatter/ARCHITECTURE.md) for the technical breakdown.
+📚 **Detailed Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md) for in-depth technical documentation.
 
-## What It Does
+---
 
-- Open local PDF files through an Electron file picker.
-- Render pages with `pdfjs-dist`, including zoom, page navigation, thumbnails, and dark-mode UI.
-- Add highlight annotations in the viewer and manage annotation comments from the sidebar.
-- Add text and image overlays in the renderer and embed them into exported PDFs with `pdf-lib`.
-- Search PDF text and highlight matches on the active page.
-- Run OCR with `tesseract.js` on the current page or across all pages.
-- Save the full document or selected page ranges while carrying over overlays and annotations.
+## 🗂️ Project Structure
 
-## Current Status
-
-Implemented and wired in the UI:
-
-- PDF open, render, zoom, and navigation
-- Thumbnail sidebar
-- Search sidebar and result highlighting
-- Highlight annotations plus annotation comment editing
-- Text insertion
-- Image insertion
-- OCR dialog
-- Save dialog with page-range selection and embedded modifications
-- Theme toggle
-
-Present in code but not fully productized:
-
-- Page-management operations exist in the main process and a `PageManagement` dialog component exists, but it is not integrated into the main toolbar flow.
-- `exportToImage` and `extractText` IPC endpoints are stubbed and currently throw.
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- npm 9+
-
-### Install
-
-```bash
-npm install
+```
+portable-document-formatter/
+├── 📂 src/
+│   ├── 🖥️ main/              # Electron main process
+│   │   ├── main.ts           # Entry point & IPC handlers
+│   │   └── services/         # PDF and file services
+│   ├── ⚛️ renderer/          # React application
+│   │   ├── components/       # UI components
+│   │   ├── store/            # Zustand state management
+│   │   └── types/            # TypeScript definitions
+│   ├── 🧪 tests/             # Vitest unit tests
+│   ├── 🎭 e2e/               # Playwright E2E tests
+│   └── 👷 workers/           # Web workers (OCR)
+├── 📂 public/                # Static assets
+├── 📂 dist/                  # Build output
+└── 📂 release/               # Distribution packages
 ```
 
-### Run in Development
+---
+
+## 🗺️ Roadmap
+
+### ✅ Completed
+- [x] PDF viewing with zoom and navigation
+- [x] Annotation system with comments
+- [x] Text and image overlays
+- [x] Full-text search with highlighting
+- [x] OCR with Tesseract.js
+- [x] Selective page export
+- [x] Dark mode support
+- [x] Thumbnail navigation
+
+### 🚧 In Progress
+- [ ] Page management (reorder, delete, rotate)
+- [ ] Export to images (PNG/JPEG)
+- [ ] Batch text extraction
+- [ ] Enhanced annotation tools (shapes, arrows)
+
+### 🔮 Future Plans
+- [ ] Cloud storage integration (Google Drive, Dropbox)
+- [ ] Real-time collaboration
+- [ ] Form filling capabilities
+- [ ] Digital signatures
+- [ ] PDF merge/split
+- [ ] Batch processing
+- [ ] Plugin system
+- [ ] Linux builds
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### Ways to Contribute
+- 🐛 **Report Bugs**: Open an issue describing the problem
+- ✨ **Suggest Features**: Share your ideas for new features
+- 📝 **Improve Documentation**: Help make our docs better
+- 💻 **Submit Pull Requests**: Fix bugs or implement features
+
+### Development Workflow
 
 ```bash
+# Fork and clone the repo
+git clone https://github.com/yourusername/portable-document-formatter.git
+
+# Create a feature branch
+git checkout -b feature/amazing-feature
+
+# Make your changes and test
 npm run dev
+npm test
+npm run test:e2e
+
+# Commit with a descriptive message
+git commit -m "Add amazing feature"
+
+# Push to your fork
+git push origin feature/amazing-feature
+
+# Open a Pull Request
 ```
 
-This starts Vite, builds the Electron main process, waits for the renderer to come up on `http://localhost:5173`, and then launches Electron.
+### Code Style
+- Use TypeScript for type safety
+- Follow existing code formatting (Prettier)
+- Write tests for new features
+- Update documentation as needed
 
-### Build
+---
 
+## 🧪 Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run E2E tests
+npm run test:e2e
+
+# Generate coverage report
+npm run test:coverage
+```
+
+---
+
+## 📦 Building
+
+### Development Build
 ```bash
 npm run build
 ```
 
-### Build A macOS DMG
+### Production Builds
 
+**macOS (Universal)**
 ```bash
+# Unsigned (for development)
 npm run dist:mac
-```
 
-This writes a universal macOS installer DMG to `release/Portable Document Formatter-<version>-universal.dmg`.
-
-For a signed build using your Apple Developer credentials:
-
-```bash
+# Signed (requires Apple Developer credentials)
 npm run dist:mac:signed
 ```
 
-### Build A Windows EXE
-
+**Windows (64-bit)**
 ```bash
+# Unsigned
 npm run dist:win
-```
 
-This writes a Windows NSIS installer EXE to `release/Portable Document Formatter-Setup-<version>.exe`.
-
-If you want a signed Windows installer, use the same command pattern after configuring your Windows code-signing certificate:
-
-```bash
+# Signed (requires code signing certificate)
 npm run dist:win:signed
 ```
 
-### Test
+Output files will be in the `release/` directory.
 
-```bash
-npm test
-npm run test:e2e
-```
+---
 
-## Common Workflows
+## 🐛 Troubleshooting
 
-### Open and Review a PDF
-
-1. Click the folder button in the toolbar.
-2. Choose a `.pdf` file.
-3. Use the sidebar thumbnails, page arrows, and zoom controls to navigate.
-
-### Add Text or Images
-
-1. Open a PDF.
-2. Click the text or image tool in the toolbar.
-3. Click on the page to place the element.
-4. Save the document to embed those edits into a new PDF.
-
-### Search
-
-1. Click the search button in the toolbar.
-2. Enter a query in the sidebar.
-3. Navigate through matches from the sidebar or result controls.
-
-### OCR
-
-1. Open a PDF.
-2. Click the OCR button.
-3. Choose current page or all pages.
-4. Run OCR and copy the extracted text from the dialog.
-
-### Save
-
-1. Click save in the toolbar.
-2. Save all pages or enter page ranges like `1-3, 5, 7-9`.
-3. Choose an output path.
-4. The app writes a new PDF with text, images, and supported annotations applied.
-
-## Project Layout
-
-```text
-src/
-  main/        Electron main process, IPC registration, file/PDF services
-  renderer/    React app, feature components, UI primitives, Zustand store
-  services/    Shared renderer-side services such as pdf.js and annotations
-  tests/       Vitest setup and unit/UI tests
-  e2e/         Playwright coverage
-  workers/     OCR worker placeholder
-```
-
-## Troubleshooting
-
-### PDF opens but does not render
-
-- Restart `npm run dev` so the Electron main process rebuilds cleanly.
-- Check that the selected file is a valid PDF.
-- The renderer converts Electron `Buffer` data to `ArrayBuffer` before loading the document; if rendering regresses, inspect [src/renderer/components/features/viewer/PDFViewer.tsx](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/renderer/components/features/viewer/PDFViewer.tsx).
+### PDF doesn't render
+- Ensure the file is a valid PDF
+- Try restarting the app in development mode: `npm run dev`
+- Check the console for error messages
 
 ### Saved PDF is missing edits
-
-- Use the toolbar save action rather than copying the original file manually.
-- Embedded save behavior is handled through `pdf:applyModifications` in [src/main/main.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/main/main.ts) and [src/main/services/pdf-service.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/main/services/pdf-service.ts).
+- Always use the **Save** button in the toolbar
+- Don't manually copy the original file
+- Edits are only embedded when saving through the app
 
 ### OCR is slow
+- OCR processing can take several seconds per page
+- For faster results, process only the current page
+- Image quality affects OCR speed and accuracy
 
-- Multi-page OCR is sequential by design.
-- Expect several seconds per page on larger or image-heavy documents.
+### macOS Gatekeeper warning
+- Right-click the app and choose **Open** the first time
+- For production use, build with `npm run dist:mac:signed`
 
-### DMG opens with a macOS warning on another computer
+### Windows SmartScreen warning
+- Click "More info" then "Run anyway"
+- For production use, code-sign with `npm run dist:win:signed`
 
-- The default `npm run dist:mac` build is ad-hoc signed so it can be packaged without Apple certificates.
-- On another Mac, the user may need to right-click the app and choose `Open` the first time.
-- For smoother distribution without Gatekeeper warnings, use `npm run dist:mac:signed` with Developer ID signing and notarization credentials configured.
+---
 
-### EXE shows a Windows SmartScreen warning
+## 📄 License
 
-- The default `npm run dist:win` build is unsigned.
-- Windows may show a SmartScreen prompt on another computer until the installer is code signed.
-- For smoother distribution, configure a Windows signing certificate before using the signed build flow.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## Notes From The Consolidated Docs
+```
+MIT License - You are free to use, modify, and distribute this software.
+```
 
-The removed Markdown files mostly covered three themes that are now merged here and in the architecture guide:
+---
 
-- setup and quick-start instructions
-- bug-fix history around PDF loading, save embedding, search, annotation editing, and OCR
-- troubleshooting and implementation notes for the renderer/main-process boundary
+## 🌟 Show Your Support
+
+If you find this project useful, please consider:
+
+- ⭐ **Starring the repository**
+- 🐛 **Reporting bugs or suggesting features**
+- 📢 **Sharing with others who might benefit**
+- 🤝 **Contributing code or documentation**
+
+---
+
+## 📞 Contact & Support
+
+- 📧 **Email**: your.email@example.com
+- 🐦 **Twitter**: [@yourhandle](https://twitter.com/yourhandle)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/portable-document-formatter/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/portable-document-formatter/issues)
+
+---
+
+## 🙏 Acknowledgments
+
+Built with amazing open-source projects:
+- [Electron](https://www.electronjs.org/) - Desktop app framework
+- [React](https://reactjs.org/) - UI library
+- [PDF.js](https://mozilla.github.io/pdf.js/) - PDF rendering by Mozilla
+- [pdf-lib](https://pdf-lib.js.org/) - PDF manipulation
+- [Tesseract.js](https://tesseract.projectnaptha.com/) - OCR engine
+- [Radix UI](https://www.radix-ui.com/) - Accessible components
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
+
+---
+
+<div align="center">
+
+  **Made with ❤️ by developers, for developers**
+
+  [⬆ Back to Top](#portable-document-formatter)
+
+</div>

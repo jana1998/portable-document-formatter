@@ -48,6 +48,7 @@ interface PDFState {
   // Actions
   setCurrentDocument: (doc: PDFDocument | null) => void;
   setCurrentPage: (page: number) => void;
+  setTotalPages: (pages: number) => void;
   setScale: (scale: number) => void;
   setRotation: (rotation: number) => void;
 
@@ -113,6 +114,7 @@ export const usePDFStore = create<PDFState>((set, get) => ({
 
   setCurrentDocument: (doc) => set({ currentDocument: doc, totalPages: doc?.pageCount || 0 }),
   setCurrentPage: (page) => set({ currentPage: page }),
+  setTotalPages: (pages) => set({ totalPages: pages }),
   setScale: (scale) => set({ scale }),
   setRotation: (rotation) => set({ rotation }),
 

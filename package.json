@@ -82,7 +82,7 @@
     "productName": "Portable Document Formatter",
     "asar": true,
     "npmRebuild": false,
-    "icon": "public/icon.svg",
+    "icon": "public/icon.png",
     "directories": {
       "output": "release"
     },
@@ -95,7 +95,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "public/icon.svg",
+      "icon": "public/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -106,7 +106,7 @@
       ]
     },
     "win": {
-      "icon": "public/icon.svg",
+      "icon": "public/icon.png",
       "target": [
         {
           "target": "nsis",
