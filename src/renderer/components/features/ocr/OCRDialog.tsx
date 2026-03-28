@@ -14,11 +14,11 @@ import { PDFRenderer } from '@/services/pdf-renderer';
 import { useToast } from '@renderer/hooks/use-toast';
 
 interface OCRDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function OCRDialog({ isOpen, onClose }: OCRDialogProps) {
+export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
   const { currentDocument, currentPage, setOCRResult, setIsProcessingOCR, totalPages } = usePDFStore();
   const [ocrMode, setOcrMode] = useState<'current' | 'all'>('current');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -140,7 +140,7 @@ export function OCRDialog({ isOpen, onClose }: OCRDialogProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>OCR - Extract Text from PDF</DialogTitle>
@@ -237,7 +237,7 @@ export function OCRDialog({ isOpen, onClose }: OCRDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             {result ? 'Close' : 'Cancel'}
           </Button>
           <Button onClick={handleOCR} disabled={isProcessing || !currentDocument}>

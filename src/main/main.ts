@@ -9,11 +9,17 @@ const pdfService = new PDFService();
 const fileService = new FileService();
 
 function createWindow() {
+  // Determine icon path based on environment
+  const iconPath = process.env.NODE_ENV === 'development'
+    ? path.join(__dirname, '../../public/icon.svg')
+    : path.join(__dirname, '../renderer/icon.svg');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

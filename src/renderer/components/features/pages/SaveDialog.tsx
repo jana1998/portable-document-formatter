@@ -12,11 +12,11 @@ import { usePDFStore } from '@renderer/store/usePDFStore';
 import { useToast } from '@renderer/hooks/use-toast';
 
 interface SaveDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function SaveDialog({ isOpen, onClose }: SaveDialogProps) {
+export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
   const { currentDocument, totalPages, annotations, textElements, imageElements } = usePDFStore();
   const [saveOption, setSaveOption] = useState<'all' | 'specific'>('all');
   const [pageRanges, setPageRanges] = useState('');
@@ -101,7 +101,7 @@ export function SaveDialog({ isOpen, onClose }: SaveDialogProps) {
         description: `File saved to: ${savePath}`,
         variant: "success",
       });
-      onClose();
+      onOpenChange(false);
     } catch (error) {
       console.error('Save failed:', error);
       toast({
@@ -138,7 +138,7 @@ export function SaveDialog({ isOpen, onClose }: SaveDialogProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Save PDF</DialogTitle>
@@ -212,7 +212,7 @@ export function SaveDialog({ isOpen, onClose }: SaveDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving || !currentDocument}>

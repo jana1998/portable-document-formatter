@@ -89,6 +89,23 @@ export function Toolbar() {
               <FileText className="h-5 w-5" />
             </div>
 
+            {currentDocument ? (
+              <ToolbarButton label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}>
+                <Button
+                  variant="toolbar"
+                  size="icon"
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  aria-label="Toggle sidebar"
+                >
+                  {isSidebarOpen ? (
+                    <PanelLeftClose className="h-4 w-4" />
+                  ) : (
+                    <PanelLeft className="h-4 w-4" />
+                  )}
+                </Button>
+              </ToolbarButton>
+            ) : null}
+
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
                 Portable Document Formatter
@@ -120,23 +137,6 @@ export function Toolbar() {
                   aria-label="Save PDF"
                 >
                   <Save className="h-4 w-4" />
-                </Button>
-              </ToolbarButton>
-            ) : null}
-
-            {currentDocument ? (
-              <ToolbarButton label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}>
-                <Button
-                  variant="toolbar"
-                  size="icon"
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  aria-label="Toggle sidebar"
-                >
-                  {isSidebarOpen ? (
-                    <PanelLeftClose className="h-4 w-4" />
-                  ) : (
-                    <PanelLeft className="h-4 w-4" />
-                  )}
                 </Button>
               </ToolbarButton>
             ) : null}

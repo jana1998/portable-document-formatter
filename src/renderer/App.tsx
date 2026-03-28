@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, FileText, FileUp, Layers3, Wand2 } from 'lucide-react';
+import { AlertTriangle, FileText, FileUp } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { TooltipProvider } from '@components/ui/tooltip';
 import { Toaster } from '@components/ui/toaster';
@@ -8,12 +8,11 @@ import { Toolbar } from '@components/common/Toolbar';
 import { Sidebar } from '@components/common/Sidebar';
 import { PDFViewer } from '@components/features/viewer/PDFViewer';
 import { EmptyState } from '@components/ui/empty-state';
-import { PanelCard, PanelCardContent, PanelCardDescription, PanelCardHeader, PanelCardTitle } from '@components/ui/panel-card';
-import { formatFileSize } from '@renderer/lib/utils';
+import { PanelCard, PanelCardContent } from '@components/ui/panel-card';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 
 function App() {
-  const { currentDocument, isSidebarOpen, setIsDarkMode, error, currentTool } = usePDFStore();
+  const { currentDocument, isSidebarOpen, setIsDarkMode, error } = usePDFStore();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -87,40 +86,8 @@ function App() {
                   </div>
                 ) : null}
 
-                <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
+                <div className="min-h-0 flex-1">
                   <PDFViewer />
-
-                  <PanelCard className="hidden xl:flex xl:flex-col">
-                    <PanelCardHeader className="pb-2">
-                      <div>
-                        <PanelCardTitle>Document Overview</PanelCardTitle>
-                        <PanelCardDescription>
-                          Fast context for the active editing session.
-                        </PanelCardDescription>
-                      </div>
-                    </PanelCardHeader>
-
-                    <PanelCardContent className="flex flex-1 flex-col gap-3">
-                      <StatusTile
-                        icon={FileText}
-                        label="File"
-                        value={currentDocument.name}
-                        detail={formatFileSize(currentDocument.fileSize)}
-                      />
-                      <StatusTile
-                        icon={Layers3}
-                        label="Mode"
-                        value={toolLabels[currentTool] ?? 'Select'}
-                        detail="Switch tools from the toolbar"
-                      />
-                      <StatusTile
-                        icon={Wand2}
-                        label="Ready"
-                        value="Edit, annotate, search"
-                        detail="The workspace is optimized for quick iteration"
-                      />
-                    </PanelCardContent>
-                  </PanelCard>
                 </div>
               </div>
             ) : (
@@ -154,40 +121,6 @@ function App() {
       </div>
       <Toaster />
     </TooltipProvider>
-  );
-}
-
-const toolLabels: Record<string, string> = {
-  select: 'Selection tool',
-  highlight: 'Highlight review',
-  text: 'Text insertion',
-  image: 'Image placement',
-};
-
-function StatusTile({
-  icon: Icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: typeof FileText;
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="panel-muted flex items-start gap-3 p-4">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 truncate text-sm font-semibold text-foreground">{value}</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
-      </div>
-    </div>
   );
 }
 
