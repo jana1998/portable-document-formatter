@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Crosshair, Loader2, RotateCw, ZoomIn } from 'lucide-react';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import { AnnotationLayer } from '@components/features/annotations/AnnotationLayer';
@@ -9,9 +10,15 @@ import { ImageInsertTool } from '@components/features/editing/ImageInsertTool';
 
 const pdfRenderer = new PDFRenderer();
 
+const toolLabels: Record<string, string> = {
+  select: 'Selection mode',
+  highlight: 'Highlight mode',
+  text: 'Text mode',
+  image: 'Image placement',
+};
+
 export function PDFViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDocumentReady, setIsDocumentReady] = useState(false);
   const [textBoxDialogOpen, setTextBoxDialogOpen] = useState(false);
@@ -31,8 +38,9 @@ export function PDFViewer() {
   useEffect(() => {
     if (currentDocument) {
       setIsDocumentReady(false);
-      loadDocument();
+      void loadDocument();
     }
+
     return () => {
       pdfRenderer.destroy();
       setIsDocumentReady(false);
@@ -41,7 +49,7 @@ export function PDFViewer() {
 
   useEffect(() => {
     if (isDocumentReady && canvasRef.current) {
-      renderPage();
+      void renderPage();
     }
   }, [currentPage, scale, rotation, isDocumentReady]);
 
@@ -54,17 +62,14 @@ export function PDFViewer() {
 
     try {
       const data = await window.electronAPI.readFile(currentDocument.path);
-
-      // Convert Buffer to ArrayBuffer if needed
-      const arrayBuffer = data instanceof ArrayBuffer
-        ? data
-        : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      const arrayBuffer =
+        data instanceof ArrayBuffer
+          ? data
+          : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
 
       await pdfRenderer.loadDocument(arrayBuffer);
 
       const pageCount = pdfRenderer.getPageCount();
-
-      // Update document with page count
       setCurrentDocument({
         ...currentDocument,
         pageCount,
@@ -72,7 +77,6 @@ export function PDFViewer() {
 
       setIsDocumentReady(true);
 
-      // Render initial page
       if (canvasRef.current) {
         await renderPage();
       }
@@ -97,17 +101,6 @@ export function PDFViewer() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground">Loading PDF...</p>
-        </div>
-      </div>
-    );
-  }
-
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!canvasRef.current || currentTool === 'select') return;
 
@@ -126,36 +119,76 @@ export function PDFViewer() {
 
   return (
     <>
-      <div
-        ref={containerRef}
-        className="h-full overflow-auto bg-muted/30 flex items-start justify-center p-8"
-        onClick={handleCanvasClick}
-        style={{ cursor: currentTool !== 'select' ? 'crosshair' : 'default' }}
-      >
-        <div className="relative">
-          <canvas
-            ref={canvasRef}
-            className="pdf-canvas bg-white shadow-lg"
-          />
-          {canvasRef.current && (
-            <>
-              <SearchHighlightLayer
-                pageNumber={currentPage}
-                canvasWidth={canvasRef.current.width}
-                canvasHeight={canvasRef.current.height}
-                scale={scale}
-              />
-              <AnnotationLayer
-                pageNumber={currentPage}
-                canvasWidth={canvasRef.current.width}
-                canvasHeight={canvasRef.current.height}
-                scale={scale}
-              />
-              <EditingLayer pageNumber={currentPage} scale={scale} />
-            </>
+      <section className="panel-surface flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+              Canvas
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+              {currentDocument?.name}
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="meta-pill">
+              <Crosshair className="h-3.5 w-3.5" />
+              {toolLabels[currentTool] ?? 'Selection mode'}
+            </div>
+            <div className="meta-pill">
+              <ZoomIn className="h-3.5 w-3.5" />
+              {Math.round(scale * 100)}%
+            </div>
+            <div className="meta-pill">
+              <RotateCw className="h-3.5 w-3.5" />
+              {rotation}deg
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="viewer-stage viewer-grid flex min-h-0 flex-1 items-start justify-center"
+          onClick={handleCanvasClick}
+          style={{ cursor: currentTool !== 'select' ? 'crosshair' : 'default' }}
+        >
+          {isLoading ? (
+            <div className="flex h-full min-h-[420px] w-full items-center justify-center">
+              <div className="panel-surface flex items-center gap-4 px-6 py-5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Rendering PDF</p>
+                  <p className="text-sm text-muted-foreground">
+                    Preparing page {currentPage} for editing.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative mx-auto">
+              <canvas ref={canvasRef} className="pdf-canvas bg-white" />
+              {canvasRef.current ? (
+                <>
+                  <SearchHighlightLayer
+                    pageNumber={currentPage}
+                    canvasWidth={canvasRef.current.width}
+                    canvasHeight={canvasRef.current.height}
+                    scale={scale}
+                  />
+                  <AnnotationLayer
+                    pageNumber={currentPage}
+                    canvasWidth={canvasRef.current.width}
+                    canvasHeight={canvasRef.current.height}
+                    scale={scale}
+                  />
+                  <EditingLayer pageNumber={currentPage} scale={scale} />
+                </>
+              ) : null}
+            </div>
           )}
         </div>
-      </div>
+      </section>
 
       <TextBoxTool
         isOpen={textBoxDialogOpen}
