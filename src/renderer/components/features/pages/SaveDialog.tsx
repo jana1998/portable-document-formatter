@@ -17,7 +17,7 @@ interface SaveDialogProps {
 }
 
 export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
-  const { currentDocument, totalPages, annotations, textElements, imageElements } = usePDFStore();
+  const { currentDocument, totalPages, annotations, textElements, imageElements, textEdits } = usePDFStore();
   const [saveOption, setSaveOption] = useState<'all' | 'specific'>('all');
   const [pageRanges, setPageRanges] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -56,12 +56,16 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
         return;
       }
 
-      // Apply all modifications (text, images, annotations) to the PDF
+      // Apply all modifications (text, images, annotations, text edits) to the PDF
       // Convert Maps to plain objects for IPC transfer
+      const pendingTextEdits = Array.from(textEdits.entries()).flatMap(([, edits]) =>
+        edits.filter((e) => e.newText !== e.originalText)
+      );
       const modificationsForIPC = {
         textElements: Array.from(textElements.entries()),
         imageElements: Array.from(imageElements.entries()),
         annotations: Array.from(annotations.entries()),
+        textEdits: pendingTextEdits,
       };
 
       // If saving specific pages, first extract pages then apply modifications
@@ -98,7 +102,7 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
 
       toast({
         title: "PDF Saved Successfully",
-        description: `File saved to: ${savePath}`,
+        description: `File saved to: ${savePath}${pendingTextEdits.length > 0 ? ` (${pendingTextEdits.length} text edit(s) applied)` : ''}`,
         variant: "success",
       });
       onOpenChange(false);

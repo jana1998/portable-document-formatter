@@ -4,6 +4,7 @@ import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import { AnnotationLayer } from '@components/features/annotations/AnnotationLayer';
 import { EditingLayer } from '@components/features/editing/EditingLayer';
+import { TextEditLayer } from '@components/features/editing/TextEditLayer';
 import { SearchHighlightLayer } from '@components/features/search/SearchHighlightLayer';
 import { TextBoxTool } from '@components/features/editing/TextBoxTool';
 import { ImageInsertTool } from '@components/features/editing/ImageInsertTool';
@@ -12,6 +13,7 @@ const pdfRenderer = new PDFRenderer();
 
 const toolLabels: Record<string, string> = {
   select: 'Selection mode',
+  'edit-text': 'Edit text mode',
   highlight: 'Highlight mode',
   text: 'Text mode',
   image: 'Image placement',
@@ -102,7 +104,7 @@ export function PDFViewer() {
   };
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!canvasRef.current || currentTool === 'select') return;
+    if (!canvasRef.current || currentTool === 'select' || currentTool === 'edit-text') return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (event.clientX - rect.left) / scale;
@@ -149,7 +151,7 @@ export function PDFViewer() {
         <div
           className="viewer-stage viewer-grid flex min-h-0 flex-1 items-start justify-center"
           onClick={handleCanvasClick}
-          style={{ cursor: currentTool !== 'select' ? 'crosshair' : 'default' }}
+          style={{ cursor: currentTool === 'edit-text' ? 'text' : currentTool !== 'select' ? 'crosshair' : 'default' }}
         >
           {isLoading ? (
             <div className="flex h-full min-h-[420px] w-full items-center justify-center">
@@ -183,6 +185,7 @@ export function PDFViewer() {
                     scale={scale}
                   />
                   <EditingLayer pageNumber={currentPage} scale={scale} />
+                  <TextEditLayer pageNumber={currentPage} scale={scale} />
                 </>
               ) : null}
             </div>

@@ -1,5 +1,25 @@
 import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+
+// mupdf is an ESM-only package; load it lazily via dynamic import so that
+// Node.js CommonJS can consume it. TypeScript cannot statically resolve it
+// under moduleResolution:node, so we type it as `any` and rely on runtime
+// correctness validated by the mupdf docs.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _mupdf: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getMupdf(): Promise<any> {
+  if (_mupdf === null) {
+    // Function() trick avoids TypeScript static-import analysis on ESM-only packages
+    // while still working correctly at Node.js runtime (dynamic import from CJS).
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const mod: { default?: unknown } = await (new Function('return import("mupdf")')() as Promise<{ default?: unknown }>);
+    _mupdf = (mod.default ?? mod) as ReturnType<typeof getMupdf>;
+  }
+  return _mupdf;
+}
 
 export class PDFService {
   async getDocumentInfo(filePath: string) {
@@ -205,6 +225,141 @@ export class PDFService {
     }
   }
 
+  /**
+   * Returns structured text for a page using mupdf, including font metrics.
+   * Called by the renderer to build the TextEditLayer overlay.
+   */
+  async getPageStructuredText(
+    filePath: string,
+    pageNumber: number
+  ): Promise<{
+    text: string;
+    bbox: { x: number; y: number; w: number; h: number };
+    font: { name: string; family: string; weight: string; style: string; size: number };
+  }[]> {
+    const mupdf = await getMupdf();
+    const pdfBytes = await fs.readFile(filePath);
+    const doc = mupdf.Document.openDocument(pdfBytes, 'application/pdf');
+    const page = doc.loadPage(pageNumber - 1);
+    const json = JSON.parse(page.toStructuredText('preserve-spans').asJSON());
+
+    const lines: {
+      text: string;
+      bbox: { x: number; y: number; w: number; h: number };
+      font: { name: string; family: string; weight: string; style: string; size: number };
+    }[] = [];
+
+    for (const block of json.blocks ?? []) {
+      if (block.type !== 'text') continue;
+      for (const line of block.lines ?? []) {
+        if (!line.text || line.text.trim() === '') continue;
+        lines.push({
+          text: line.text,
+          bbox: {
+            x: line.bbox.x,
+            y: line.bbox.y,
+            w: line.bbox.w,
+            h: line.bbox.h,
+          },
+          font: {
+            name: line.font?.name ?? 'Helvetica',
+            family: line.font?.family ?? 'sans-serif',
+            weight: line.font?.weight ?? 'normal',
+            style: line.font?.style ?? 'normal',
+            size: line.font?.size ?? 12,
+          },
+        });
+      }
+    }
+
+    doc.destroy();
+    return lines;
+  }
+
+  /**
+   * Foxit-style text editing: uses mupdf Redaction API to physically remove
+   * original text from the PDF content stream, then writes new text in its place.
+   * Returns the path to the modified PDF.
+   */
+  async applyTextEditsToPDF(
+    filePath: string,
+    textEdits: {
+      pageNumber: number;
+      originalText: string;
+      newText: string;
+      mupdfX: number;
+      mupdfY: number;
+      mupdfW: number;
+      mupdfH: number;
+      fontSize: number;
+    }[],
+    outputPath: string
+  ): Promise<void> {
+    const log = (...args: unknown[]) => console.log('[TextEdits]', ...args);
+
+    log(`applyTextEditsToPDF called: ${textEdits.length} edits`);
+
+    if (textEdits.length === 0) {
+      await fs.copyFile(filePath, outputPath);
+      return;
+    }
+
+    const pdfBytes = await fs.readFile(filePath);
+    log(`input PDF size: ${pdfBytes.length} bytes`);
+
+    let pdfDoc;
+    try {
+      pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+    } catch (e) {
+      log('PDFDocument.load failed:', String(e));
+      throw e;
+    }
+    log(`pdf-lib loaded OK, pages: ${pdfDoc.getPageCount()}`);
+
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    const editsByPage = new Map<number, typeof textEdits>();
+    for (const edit of textEdits) {
+      if (!editsByPage.has(edit.pageNumber)) editsByPage.set(edit.pageNumber, []);
+      editsByPage.get(edit.pageNumber)!.push(edit);
+    }
+
+    for (const [pageNumber, pageEdits] of editsByPage) {
+      const page = pdfDoc.getPage(pageNumber - 1);
+      const pageHeight = page.getHeight();
+      const pageWidth = page.getWidth();
+      log(`page ${pageNumber}: size ${pageWidth}x${pageHeight}, edits: ${pageEdits.length}`);
+
+      for (const edit of pageEdits) {
+        if (!edit.newText || edit.newText.trim() === '') {
+          log(`  skip empty newText for "${edit.originalText}"`);
+          continue;
+        }
+
+        const x = edit.mupdfX;
+        // mupdf bbox: y is from top-of-page downward. pdf-lib: y is from bottom upward.
+        // rectBottom = pdf-lib coordinate of the BOTTOM of the mupdf bbox.
+        // pdf-lib drawText places text at the BASELINE, which is ~20% of fontSize
+        // above the descender / bottom of the line bbox.
+        const rectBottom = pageHeight - (edit.mupdfY + edit.mupdfH);
+        const textY = rectBottom + edit.fontSize * 0.2; // shift baseline up from rect bottom
+        const w = edit.mupdfW;
+        const h = edit.mupdfH;
+
+        log(`  "${edit.originalText}" → "${edit.newText}" x=${x.toFixed(1)} textY=${textY.toFixed(1)} size=${edit.fontSize}`);
+
+        // White rectangle with small margin to fully erase the original text
+        page.drawRectangle({ x: x - 1, y: rectBottom - 1, width: w + 6, height: h + 2, color: rgb(1, 1, 1), borderWidth: 0 });
+        // Draw replacement text at corrected baseline
+        page.drawText(edit.newText, { x, y: textY, size: edit.fontSize, font, color: rgb(0, 0, 0) });
+      }
+    }
+
+    const outputBytes = await pdfDoc.save();
+    await fs.writeFile(outputPath, outputBytes);
+    log(`Done: ${outputBytes.length} bytes → ${outputPath}`);
+  }
+
   async exportPageToImage(_filePath: string, _pageNumber: number, _format: string, _dpi: number): Promise<string> {
     // This would require a library like pdf2pic or similar
     // For now, return a placeholder
@@ -223,11 +378,21 @@ export class PDFService {
       textElements: [number, any[]][];
       imageElements: [number, any[]][];
       annotations: [number, any[]][];
+      textEdits?: any[];
     },
     outputPath: string
   ): Promise<void> {
     try {
-      const pdfBytes = await fs.readFile(filePath);
+      // If there are text edits, apply them first via mupdf (Foxit-style),
+      // then feed the result into pdf-lib for other modifications.
+      let sourceFilePath = filePath;
+      if (modifications.textEdits && modifications.textEdits.length > 0) {
+        const tmpPath = path.join(os.tmpdir(), `pdf-textedit-${Date.now()}.pdf`);
+        await this.applyTextEditsToPDF(filePath, modifications.textEdits, tmpPath);
+        sourceFilePath = tmpPath;
+      }
+
+      const pdfBytes = await fs.readFile(sourceFilePath);
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
