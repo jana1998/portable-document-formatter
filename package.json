@@ -38,6 +38,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
+    "mupdf": "^1.27.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "react": "^18.2.0",
@@ -62,6 +63,7 @@
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "electron": "^28.1.0",
+    "electron-builder": "^24.13.3",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -74,7 +76,6 @@
     "vite": "^5.0.8",
     "vite-plugin-electron": "^0.28.0",
     "vitest": "^1.0.4",
-    "electron-builder": "^24.13.3",
     "wait-on": "^7.2.0"
   },
   "build": {

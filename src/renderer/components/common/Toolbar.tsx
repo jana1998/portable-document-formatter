@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  FileEdit,
   FileText,
   FileUp,
   Highlighter,
@@ -36,8 +37,9 @@ import { cn, formatFileSize, formatRelativeTime } from '@renderer/lib/utils';
 
 const toolOptions = [
   { id: 'select', label: 'Select', icon: Pointer },
+  { id: 'edit-text', label: 'Edit Text', icon: FileEdit },
   { id: 'highlight', label: 'Highlight', icon: Highlighter },
-  { id: 'text', label: 'Text', icon: Type },
+  { id: 'text', label: 'Add Text', icon: Type },
   { id: 'image', label: 'Image', icon: ImageIcon },
 ] as const;
 
