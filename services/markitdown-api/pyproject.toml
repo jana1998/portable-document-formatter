@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-api"
+version = "0.1.0"
+description = "FastAPI wrapper around Microsoft MarkItDown for document conversion."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0,<1.0.0",
+  "markitdown>=0.1.0",
+  "python-multipart>=0.0.9",
+  "uvicorn>=0.32.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28.0",
+  "pytest>=8.3.0",
+]
+
+[project.scripts]
+markitdown-api = "markitdown_api.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/markitdown_api"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
