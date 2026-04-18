@@ -28,6 +28,9 @@ flowchart TB
         MainEntry[main.ts]
         FileService[file-service.ts]
         PDFService[pdf-service.ts]
+        DocumentProcessorService[document-processor-service.ts]
+        MarkItDownProcessor[markitdown-processor.ts]
+        TesseractProcessor[tesseract-processor.ts]
     end
 
     App --> Toolbar
@@ -49,6 +52,9 @@ flowchart TB
     Preload --> MainEntry
     MainEntry --> FileService
     MainEntry --> PDFService
+    MainEntry --> DocumentProcessorService
+    DocumentProcessorService --> MarkItDownProcessor
+    DocumentProcessorService --> TesseractProcessor
 ```
 
 ## Key Responsibilities
@@ -66,6 +72,9 @@ flowchart TB
 - `main.ts` creates the Electron window and registers IPC handlers.
 - `file-service.ts` handles file metadata plus raw read and write operations.
 - `pdf-service.ts` performs PDF mutations with `pdf-lib`, including merge, split, delete, extract, rotate, text insertion, image insertion, and the consolidated save path that applies in-memory modifications.
+- `document-processor-service.ts` orchestrates pluggable document processing backends using the Strategy Pattern, with automatic processor selection based on file type and availability.
+- `markitdown-processor.ts` provides high-priority document processing using Python's MarkItDown library for comprehensive format support.
+- `tesseract-processor.ts` provides fallback OCR-based processing using Tesseract.js for images and scanned documents.
 
 ## Core Data Model
 
@@ -280,8 +289,145 @@ The sidecar annotation save and the embedded PDF export are separate mechanisms.
 - `exportPageToImage()` and `extractText()` in [src/main/services/pdf-service.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/main/services/pdf-service.ts) intentionally throw and need additional dependencies before they can be documented as shipped features.
 - The PDF.js worker path is CDN-based in [src/services/pdf-renderer.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/services/pdf-renderer.ts), which is simple for development but not ideal for fully offline packaging.
 
+## Document Processor Abstraction Layer (Phase 1.2)
+
+### Overview
+
+The Document Processor Abstraction Layer implements the **Strategy Pattern** to provide pluggable document processing backends with automatic selection based on file type and processor availability.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    Client[Client Code] --> Service[DocumentProcessorService]
+    Service --> FileDetector[File Type Detector]
+    Service --> ProcessorRegistry[Processor Registry]
+
+    ProcessorRegistry --> MarkItDown[MarkItDown Processor<br/>Priority: HIGH]
+    ProcessorRegistry --> Tesseract[Tesseract Processor<br/>Priority: FALLBACK]
+    ProcessorRegistry --> Custom[Custom Processors<br/>Priority: NORMAL]
+
+    FileDetector --> MagicBytes[Magic Bytes Detection]
+    FileDetector --> Extension[Extension Detection]
+
+    MarkItDown --> Python[Python subprocess<br/>markitdown library]
+    Tesseract --> TesseractJS[Tesseract.js Worker]
+```
+
+### Key Components
+
+1. **DocumentProcessor Interface** - Strategy interface that all processors implement:
+   - `canProcess(fileType)` - Check if processor supports file type
+   - `isAvailable()` - Verify processor dependencies are available
+   - `process(filePath, options)` - Process document from file
+   - `processBuffer(buffer, fileType, options)` - Process from memory buffer
+   - `cleanup()` - Release resources
+
+2. **DocumentProcessorService** - Context/Registry:
+   - Maintains registry of available processors
+   - Performs automatic file type detection
+   - Selects highest-priority available processor
+   - Caches availability checks (1 minute TTL)
+   - Provides unified API for document processing
+
+3. **File Type Detector**:
+   - Magic byte signature detection (high confidence)
+   - Extension-based fallback (medium confidence)
+   - Supports PDF, Office documents, images, text formats
+
+4. **Concrete Processors**:
+   - **MarkItDownProcessor** (Priority: HIGH) - Python subprocess integration
+   - **TesseractProcessor** (Priority: FALLBACK) - OCR-based processing
+
+### Processor Selection Algorithm
+
+```
+1. Detect file type using magic bytes and extension
+2. Find all processors where canProcess(fileType) == true
+3. Sort processors by priority (descending)
+4. For each processor in priority order:
+   a. Check availability (with caching)
+   b. If available, use this processor
+   c. Otherwise, try next processor
+5. If no processor available, throw error
+```
+
+### Usage Example
+
+```typescript
+// Register processors (at app startup)
+documentProcessorService.registerProcessor(new MarkItDownProcessor());
+documentProcessorService.registerProcessor(new TesseractProcessor());
+
+// Process document (automatic selection)
+const result = await documentProcessorService.processDocument('/path/to/doc.pdf');
+// Uses MarkItDown if available, falls back to Tesseract if not
+
+// Result structure:
+// {
+//   text: "extracted content...",
+//   confidence: 95,
+//   processorName: "MarkItDownProcessor",
+//   processingTime: 234,
+//   metadata: { pageCount: 5, author: "..." }
+// }
+```
+
+### Supported File Types
+
+| Type | Formats | MarkItDown | Tesseract |
+|------|---------|------------|-----------|
+| PDF | .pdf | ✓ | ✓ (OCR only) |
+| Office | .docx, .xlsx, .pptx | ✓ | ✗ |
+| Images | .png, .jpg, .gif, .bmp | ✓ | ✓ |
+| Text | .txt, .md, .html, .csv | ✓ | ✗ |
+
+### Error Handling
+
+The system uses structured error handling via `DocumentProcessingError`:
+
+```typescript
+enum ProcessingErrorCode {
+  UNSUPPORTED_FILE_TYPE,
+  FILE_NOT_FOUND,
+  FILE_CORRUPTED,
+  PROCESSING_TIMEOUT,
+  PROCESSOR_UNAVAILABLE,
+  OCR_FAILED,
+  UNKNOWN_ERROR
+}
+```
+
+### Integration Points
+
+- **Main Process**: Service runs in Electron main process for file system access
+- **IPC Bridge**: Exposed via IPC handlers for renderer access
+- **OCR Dialog**: Can leverage document processor for enhanced OCR
+- **File Import**: Future integration for importing non-PDF formats
+
+### Testing
+
+Comprehensive test suite covers:
+- Processor registration and lifecycle
+- Priority-based selection and fallback
+- Availability caching
+- File type detection (magic bytes and extensions)
+- Error handling and edge cases
+- All 26 tests passing
+
+### Future Enhancements
+
+- **Phase 1.3**: Native PDF text extraction (pdf-lib integration)
+- **Phase 1.4**: Direct Office parsing (no Python dependency)
+- **Phase 1.5**: Worker pool for parallel processing
+- **Phase 1.6**: Streaming API for large documents
+- **Phase 1.7**: Progress reporting and cancellation
+
+See [DOCUMENT_PROCESSOR_README.md](./DOCUMENT_PROCESSOR_README.md) for detailed documentation.
+
 ## Testing Surface
 
-- Unit tests cover the PDF renderer, annotation service, Zustand store, and toolbar UI.
+- Unit tests cover the PDF renderer, annotation service, Zustand store, toolbar UI, and document processor abstraction layer.
+- Document processor tests verify processor selection, fallback behavior, file type detection, and error handling.
 - Playwright coverage is light and currently focuses on shell-level behavior rather than full document workflows.
 - For changes near save, OCR, or viewer loading, manual verification still matters because those paths depend on Electron, canvas rendering, and local file dialogs.
