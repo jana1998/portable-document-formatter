@@ -1,0 +1,1402 @@
+{
+  "metadata": {
+    "project": "Portable Document Formatter",
+    "description": "Knowledge graph of the Electron PDF editor application",
+    "generated": "2026-04-18",
+    "version": "1.0.0",
+    "totalFiles": 49,
+    "totalNodes": 87,
+    "totalEdges": 142
+  },
+  "nodes": [
+    {
+      "id": "main-process",
+      "type": "layer",
+      "label": "Main Process",
+      "description": "Electron main process - handles IPC, file operations, PDF manipulation",
+      "properties": {
+        "security": "high",
+        "role": "backend"
+      }
+    },
+    {
+      "id": "renderer-process",
+      "type": "layer",
+      "label": "Renderer Process",
+      "description": "React UI application - handles user interaction and visualization",
+      "properties": {
+        "security": "sandboxed",
+        "role": "frontend"
+      }
+    },
+    {
+      "id": "services-layer",
+      "type": "layer",
+      "label": "Shared Services",
+      "description": "Shared business logic services",
+      "properties": {
+        "role": "business-logic"
+      }
+    },
+    {
+      "id": "workers-layer",
+      "type": "layer",
+      "label": "Web Workers",
+      "description": "Background processing workers",
+      "properties": {
+        "role": "background-processing"
+      }
+    },
+    {
+      "id": "main.ts",
+      "type": "file",
+      "label": "main.ts",
+      "path": "src/main/main.ts",
+      "language": "typescript",
+      "lines": 175,
+      "description": "Electron main process entry point - window management and IPC handlers",
+      "responsibilities": [
+        "Create BrowserWindow",
+        "Register 19 IPC handlers",
+        "Manage window lifecycle",
+        "Initialize services"
+      ],
+      "exports": [],
+      "imports": [
+        "electron",
+        "PDFService",
+        "FileService"
+      ]
+    },
+    {
+      "id": "preload.ts",
+      "type": "file",
+      "label": "preload.ts",
+      "path": "src/main/preload.ts",
+      "language": "typescript",
+      "lines": 65,
+      "description": "Security bridge using contextBridge - exposes whitelist API",
+      "responsibilities": [
+        "Context isolation enforcement",
+        "Whitelist API exposure",
+        "IPC method wrapping"
+      ],
+      "exports": [
+        "window.electronAPI"
+      ],
+      "imports": [
+        "electron"
+      ]
+    },
+    {
+      "id": "file-service.ts",
+      "type": "file",
+      "label": "file-service.ts",
+      "path": "src/main/services/file-service.ts",
+      "language": "typescript",
+      "lines": 60,
+      "description": "File system operations abstraction",
+      "responsibilities": [
+        "File metadata retrieval",
+        "File read/write operations",
+        "Directory management"
+      ],
+      "exports": [
+        "FileService"
+      ],
+      "imports": [
+        "fs/promises",
+        "path"
+      ]
+    },
+    {
+      "id": "pdf-service.ts",
+      "type": "file",
+      "label": "pdf-service.ts",
+      "path": "src/main/services/pdf-service.ts",
+      "language": "typescript",
+      "lines": 644,
+      "description": "Core PDF manipulation engine using pdf-lib and mupdf",
+      "responsibilities": [
+        "PDF document information",
+        "Page operations (merge, split, delete, extract, reorder, rotate)",
+        "Content insertion (text, images)",
+        "Text editing (Foxit-style)",
+        "Modification consolidation"
+      ],
+      "exports": [
+        "PDFService"
+      ],
+      "imports": [
+        "pdf-lib",
+        "mupdf",
+        "fs/promises"
+      ]
+    },
+    {
+      "id": "App.tsx",
+      "type": "file",
+      "label": "App.tsx",
+      "path": "src/renderer/App.tsx",
+      "language": "typescript",
+      "lines": 128,
+      "description": "Root React component - application shell and routing",
+      "responsibilities": [
+        "Layout composition",
+        "Dark mode management",
+        "File opening flow",
+        "Empty state handling"
+      ],
+      "exports": [
+        "App"
+      ],
+      "imports": [
+        "usePDFStore",
+        "Toolbar",
+        "Sidebar",
+        "PDFViewer",
+        "EmptyState"
+      ]
+    },
+    {
+      "id": "usePDFStore.ts",
+      "type": "file",
+      "label": "usePDFStore.ts",
+      "path": "src/renderer/store/usePDFStore.ts",
+      "language": "typescript",
+      "lines": 290,
+      "description": "Global Zustand store - single source of truth for application state",
+      "responsibilities": [
+        "Document state management",
+        "Overlay data (annotations, text, images)",
+        "Search state",
+        "OCR results",
+        "UI state",
+        "31 setter actions"
+      ],
+      "exports": [
+        "usePDFStore",
+        "PDFState"
+      ],
+      "imports": [
+        "zustand"
+      ]
+    },
+    {
+      "id": "types.ts",
+      "type": "file",
+      "label": "index.ts",
+      "path": "src/renderer/types/index.ts",
+      "language": "typescript",
+      "lines": 164,
+      "description": "TypeScript type definitions for the application",
+      "responsibilities": [
+        "Define core data models",
+        "Type annotations",
+        "Interface definitions"
+      ],
+      "exports": [
+        "PDFDocument",
+        "Annotation",
+        "TextElement",
+        "ImageElement",
+        "TextEdit",
+        "SearchResult",
+        "OCRResult"
+      ],
+      "imports": []
+    },
+    {
+      "id": "Toolbar.tsx",
+      "type": "file",
+      "label": "Toolbar.tsx",
+      "path": "src/renderer/components/common/Toolbar.tsx",
+      "language": "typescript",
+      "lines": 352,
+      "description": "Top toolbar component - file operations and tool selection",
+      "responsibilities": [
+        "File operations (open, save)",
+        "Page navigation",
+        "Zoom controls",
+        "12 tool selection buttons",
+        "Search, rotate, OCR triggers",
+        "Theme toggle"
+      ],
+      "exports": [
+        "Toolbar"
+      ],
+      "imports": [
+        "usePDFStore",
+        "SaveDialog",
+        "OCRDialog",
+        "lucide-react"
+      ]
+    },
+    {
+      "id": "Sidebar.tsx",
+      "type": "file",
+      "label": "Sidebar.tsx",
+      "path": "src/renderer/components/common/Sidebar.tsx",
+      "language": "typescript",
+      "lines": 72,
+      "description": "Left sidebar component - tab navigation and panels",
+      "responsibilities": [
+        "Tab switching (thumbnails, annotations, search)",
+        "Statistics display",
+        "Panel routing"
+      ],
+      "exports": [
+        "Sidebar"
+      ],
+      "imports": [
+        "usePDFStore",
+        "ThumbnailsPanel",
+        "AnnotationsPanel",
+        "SearchPanel"
+      ]
+    },
+    {
+      "id": "PDFViewer.tsx",
+      "type": "file",
+      "label": "PDFViewer.tsx",
+      "path": "src/renderer/components/features/viewer/PDFViewer.tsx",
+      "language": "typescript",
+      "lines": 210,
+      "description": "Main PDF canvas component - document rendering and layer composition",
+      "responsibilities": [
+        "Document loading",
+        "Page rendering via PDF.js",
+        "Layer composition (search, annotations, editing)",
+        "Tool interaction handling"
+      ],
+      "exports": [
+        "PDFViewer"
+      ],
+      "imports": [
+        "usePDFStore",
+        "PDFRenderer",
+        "SearchHighlightLayer",
+        "AnnotationLayer",
+        "EditingLayer",
+        "TextEditLayer",
+        "window.electronAPI"
+      ]
+    },
+    {
+      "id": "ThumbnailsPanel.tsx",
+      "type": "file",
+      "label": "ThumbnailsPanel.tsx",
+      "path": "src/renderer/components/features/viewer/ThumbnailsPanel.tsx",
+      "language": "typescript",
+      "lines": 289,
+      "description": "Thumbnail sidebar panel - page previews and drag-and-drop reordering",
+      "responsibilities": [
+        "Thumbnail generation (0.2 scale)",
+        "Page navigation",
+        "Drag-and-drop page reordering",
+        "First 20 pages only (performance)"
+      ],
+      "exports": [
+        "ThumbnailsPanel"
+      ],
+      "imports": [
+        "usePDFStore",
+        "PDFRenderer",
+        "window.electronAPI"
+      ]
+    },
+    {
+      "id": "AnnotationLayer.tsx",
+      "type": "file",
+      "label": "AnnotationLayer.tsx",
+      "path": "src/renderer/components/features/annotations/AnnotationLayer.tsx",
+      "language": "typescript",
+      "lines": 465,
+      "description": "SVG overlay for interactive annotation drawing",
+      "responsibilities": [
+        "Mouse interaction handling (down, move, up)",
+        "11 annotation type rendering",
+        "Selection highlighting",
+        "Coordinate system management"
+      ],
+      "exports": [
+        "AnnotationLayer"
+      ],
+      "imports": [
+        "usePDFStore",
+        "annotationService",
+        "lucide-react"
+      ]
+    },
+    {
+      "id": "AnnotationsPanel.tsx",
+      "type": "file",
+      "label": "AnnotationsPanel.tsx",
+      "path": "src/renderer/components/features/annotations/AnnotationsPanel.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "Sidebar panel listing all annotations",
+      "responsibilities": [
+        "Display annotation list",
+        "Navigation to annotations",
+        "Annotation filtering"
+      ],
+      "exports": [
+        "AnnotationsPanel"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "TextEditLayer.tsx",
+      "type": "file",
+      "label": "TextEditLayer.tsx",
+      "path": "src/renderer/components/features/editing/TextEditLayer.tsx",
+      "language": "typescript",
+      "lines": 186,
+      "description": "Foxit-style in-place text editing overlay",
+      "responsibilities": [
+        "Fetch structured text from mupdf",
+        "Render clickable text line overlays",
+        "In-place editing interface",
+        "Visual edit indicators"
+      ],
+      "exports": [
+        "TextEditLayer"
+      ],
+      "imports": [
+        "usePDFStore",
+        "window.electronAPI"
+      ]
+    },
+    {
+      "id": "EditingLayer.tsx",
+      "type": "file",
+      "label": "EditingLayer.tsx",
+      "path": "src/renderer/components/features/editing/EditingLayer.tsx",
+      "language": "typescript",
+      "lines": 63,
+      "description": "Overlay layer for text and image elements added via tools",
+      "responsibilities": [
+        "Render text overlays",
+        "Render image overlays",
+        "Element positioning"
+      ],
+      "exports": [
+        "EditingLayer"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "TextBoxTool.tsx",
+      "type": "file",
+      "label": "TextBoxTool.tsx",
+      "path": "src/renderer/components/features/editing/TextBoxTool.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "Text insertion dialog",
+      "responsibilities": [
+        "Text input form",
+        "Font and size selection",
+        "Text element creation"
+      ],
+      "exports": [
+        "TextBoxTool"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "ImageInsertTool.tsx",
+      "type": "file",
+      "label": "ImageInsertTool.tsx",
+      "path": "src/renderer/components/features/editing/ImageInsertTool.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "Image insertion dialog",
+      "responsibilities": [
+        "Image file selection",
+        "Image preview",
+        "Image element creation"
+      ],
+      "exports": [
+        "ImageInsertTool"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "SearchPanel.tsx",
+      "type": "file",
+      "label": "SearchPanel.tsx",
+      "path": "src/renderer/components/features/search/SearchPanel.tsx",
+      "language": "typescript",
+      "lines": 190,
+      "description": "Search sidebar panel - full-text search interface",
+      "responsibilities": [
+        "Search input handling",
+        "Execute PDF.js text search",
+        "Display paginated results",
+        "Next/previous navigation"
+      ],
+      "exports": [
+        "SearchPanel"
+      ],
+      "imports": [
+        "usePDFStore",
+        "PDFRenderer",
+        "window.electronAPI"
+      ]
+    },
+    {
+      "id": "SearchHighlightLayer.tsx",
+      "type": "file",
+      "label": "SearchHighlightLayer.tsx",
+      "path": "src/renderer/components/features/search/SearchHighlightLayer.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "Visual highlight overlay for search results",
+      "responsibilities": [
+        "Render yellow highlight rectangles",
+        "Position highlights at match locations"
+      ],
+      "exports": [
+        "SearchHighlightLayer"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "SaveDialog.tsx",
+      "type": "file",
+      "label": "SaveDialog.tsx",
+      "path": "src/renderer/components/features/pages/SaveDialog.tsx",
+      "language": "typescript",
+      "lines": 230,
+      "description": "Save/export dialog - page selection and modification consolidation",
+      "responsibilities": [
+        "Page range selection",
+        "Modification gathering (text, images, annotations, edits)",
+        "Page extraction for partial saves",
+        "IPC to applyModifications"
+      ],
+      "exports": [
+        "SaveDialog"
+      ],
+      "imports": [
+        "usePDFStore",
+        "window.electronAPI"
+      ]
+    },
+    {
+      "id": "PageManagement.tsx",
+      "type": "file",
+      "label": "PageManagement.tsx",
+      "path": "src/renderer/components/features/pages/PageManagement.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "Page management UI (not fully wired)",
+      "responsibilities": [
+        "Page reordering UI",
+        "Page deletion UI",
+        "Page merge/split UI"
+      ],
+      "exports": [
+        "PageManagement"
+      ],
+      "imports": [
+        "usePDFStore"
+      ]
+    },
+    {
+      "id": "OCRDialog.tsx",
+      "type": "file",
+      "label": "OCRDialog.tsx",
+      "path": "src/renderer/components/features/ocr/OCRDialog.tsx",
+      "language": "typescript",
+      "lines": null,
+      "description": "OCR processing dialog",
+      "responsibilities": [
+        "Page selection (current or all)",
+        "Tesseract.js OCR processing",
+        "Result display and copy"
+      ],
+      "exports": [
+        "OCRDialog"
+      ],
+      "imports": [
+        "usePDFStore",
+        "tesseract.js"
+      ]
+    },
+    {
+      "id": "pdf-renderer.ts",
+      "type": "file",
+      "label": "pdf-renderer.ts",
+      "path": "src/services/pdf-renderer.ts",
+      "language": "typescript",
+      "lines": 164,
+      "description": "PDF.js wrapper for renderer-side document handling",
+      "responsibilities": [
+        "Document loading",
+        "Page rendering to canvas",
+        "Text content extraction",
+        "Full-text search",
+        "Worker management"
+      ],
+      "exports": [
+        "PDFRenderer"
+      ],
+      "imports": [
+        "pdfjs-dist"
+      ]
+    },
+    {
+      "id": "annotation-service.ts",
+      "type": "file",
+      "label": "annotation-service.ts",
+      "path": "src/services/annotation-service.ts",
+      "language": "typescript",
+      "lines": 80,
+      "description": "Client-side annotation management singleton",
+      "responsibilities": [
+        "Annotation CRUD operations",
+        "Page-based annotation retrieval",
+        "Import/export annotations",
+        "Annotation ID generation"
+      ],
+      "exports": [
+        "annotationService",
+        "AnnotationService"
+      ],
+      "imports": []
+    },
+    {
+      "id": "ocr-service.ts",
+      "type": "file",
+      "label": "ocr-service.ts",
+      "path": "src/services/ocr-service.ts",
+      "language": "typescript",
+      "lines": 42,
+      "description": "OCR service placeholder (not fully implemented)",
+      "responsibilities": [
+        "Worker-based OCR processing (placeholder)"
+      ],
+      "exports": [
+        "ocrService"
+      ],
+      "imports": []
+    },
+    {
+      "id": "ocr-worker.ts",
+      "type": "file",
+      "label": "ocr-worker.ts",
+      "path": "src/workers/ocr-worker.ts",
+      "language": "typescript",
+      "lines": 55,
+      "description": "Web Worker for background OCR processing with Tesseract.js",
+      "responsibilities": [
+        "Tesseract.js initialization",
+        "Image recognition",
+        "Message protocol handling",
+        "Worker lifecycle management"
+      ],
+      "exports": [],
+      "imports": [
+        "tesseract.js"
+      ]
+    },
+    {
+      "id": "ipc-bridge",
+      "type": "concept",
+      "label": "IPC Bridge",
+      "description": "Secure communication channel between renderer and main process",
+      "properties": {
+        "security": "context-isolated",
+        "pattern": "invoke/handle",
+        "channels": 19
+      }
+    },
+    {
+      "id": "state-management",
+      "type": "concept",
+      "label": "State Management",
+      "description": "Global Zustand store pattern",
+      "properties": {
+        "pattern": "zustand",
+        "immutability": true,
+        "actions": 31
+      }
+    },
+    {
+      "id": "layer-composition",
+      "type": "concept",
+      "label": "Layer Composition",
+      "description": "Stacked overlay rendering pattern",
+      "properties": {
+        "layers": ["canvas", "search", "annotations", "editing", "text-edit"]
+      }
+    },
+    {
+      "id": "pdf-lib",
+      "type": "dependency",
+      "label": "pdf-lib",
+      "description": "PDF creation and modification library",
+      "version": "1.17.1"
+    },
+    {
+      "id": "pdfjs-dist",
+      "type": "dependency",
+      "label": "pdfjs-dist",
+      "description": "PDF.js rendering engine by Mozilla",
+      "version": "3.11.174"
+    },
+    {
+      "id": "mupdf",
+      "type": "dependency",
+      "label": "mupdf",
+      "description": "MuPDF for text extraction with font metrics",
+      "version": "1.27.0"
+    },
+    {
+      "id": "tesseract.js",
+      "type": "dependency",
+      "label": "tesseract.js",
+      "description": "OCR engine",
+      "version": "5.0.4"
+    },
+    {
+      "id": "zustand",
+      "type": "dependency",
+      "label": "zustand",
+      "description": "State management library",
+      "version": "4.4.7"
+    },
+    {
+      "id": "electron",
+      "type": "dependency",
+      "label": "electron",
+      "description": "Cross-platform desktop framework",
+      "version": "28.1.0"
+    },
+    {
+      "id": "react",
+      "type": "dependency",
+      "label": "react",
+      "description": "UI library",
+      "version": "18.2.0"
+    }
+  ],
+  "edges": [
+    {
+      "source": "main.ts",
+      "target": "main-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "preload.ts",
+      "target": "main-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "file-service.ts",
+      "target": "main-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "pdf-service.ts",
+      "target": "main-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "App.tsx",
+      "target": "renderer-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "usePDFStore.ts",
+      "target": "renderer-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "renderer-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "renderer-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "renderer-process",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "pdf-renderer.ts",
+      "target": "services-layer",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "annotation-service.ts",
+      "target": "services-layer",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "ocr-service.ts",
+      "target": "services-layer",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "ocr-worker.ts",
+      "target": "workers-layer",
+      "type": "belongs-to",
+      "label": "part of"
+    },
+    {
+      "source": "main.ts",
+      "target": "file-service.ts",
+      "type": "imports",
+      "label": "uses"
+    },
+    {
+      "source": "main.ts",
+      "target": "pdf-service.ts",
+      "type": "imports",
+      "label": "uses"
+    },
+    {
+      "source": "main.ts",
+      "target": "electron",
+      "type": "depends-on",
+      "label": "requires"
+    },
+    {
+      "source": "preload.ts",
+      "target": "electron",
+      "type": "depends-on",
+      "label": "requires"
+    },
+    {
+      "source": "preload.ts",
+      "target": "ipc-bridge",
+      "type": "implements",
+      "label": "creates"
+    },
+    {
+      "source": "pdf-service.ts",
+      "target": "pdf-lib",
+      "type": "depends-on",
+      "label": "uses for modification"
+    },
+    {
+      "source": "pdf-service.ts",
+      "target": "mupdf",
+      "type": "depends-on",
+      "label": "uses for text extraction"
+    },
+    {
+      "source": "App.tsx",
+      "target": "Toolbar.tsx",
+      "type": "imports",
+      "label": "renders"
+    },
+    {
+      "source": "App.tsx",
+      "target": "Sidebar.tsx",
+      "type": "imports",
+      "label": "renders"
+    },
+    {
+      "source": "App.tsx",
+      "target": "PDFViewer.tsx",
+      "type": "imports",
+      "label": "renders"
+    },
+    {
+      "source": "App.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads state"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads/writes state"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "SaveDialog.tsx",
+      "type": "imports",
+      "label": "shows dialog"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "OCRDialog.tsx",
+      "type": "imports",
+      "label": "shows dialog"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "calls IPC"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads state"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "ThumbnailsPanel.tsx",
+      "type": "imports",
+      "label": "routes to"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "AnnotationsPanel.tsx",
+      "type": "imports",
+      "label": "routes to"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "SearchPanel.tsx",
+      "type": "imports",
+      "label": "routes to"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads state"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "pdf-renderer.ts",
+      "type": "imports",
+      "label": "renders via"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "SearchHighlightLayer.tsx",
+      "type": "imports",
+      "label": "composes layer"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "AnnotationLayer.tsx",
+      "type": "imports",
+      "label": "composes layer"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "EditingLayer.tsx",
+      "type": "imports",
+      "label": "composes layer"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "TextEditLayer.tsx",
+      "type": "imports",
+      "label": "composes layer"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "loads document via"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "layer-composition",
+      "type": "implements",
+      "label": "uses pattern"
+    },
+    {
+      "source": "ThumbnailsPanel.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads state"
+    },
+    {
+      "source": "ThumbnailsPanel.tsx",
+      "target": "pdf-renderer.ts",
+      "type": "imports",
+      "label": "generates thumbnails via"
+    },
+    {
+      "source": "ThumbnailsPanel.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "reorders pages via"
+    },
+    {
+      "source": "AnnotationLayer.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads/writes annotations"
+    },
+    {
+      "source": "AnnotationLayer.tsx",
+      "target": "annotation-service.ts",
+      "type": "imports",
+      "label": "creates annotations via"
+    },
+    {
+      "source": "AnnotationsPanel.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads annotations"
+    },
+    {
+      "source": "TextEditLayer.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads/writes text edits"
+    },
+    {
+      "source": "TextEditLayer.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "fetches structured text via"
+    },
+    {
+      "source": "EditingLayer.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads text/image elements"
+    },
+    {
+      "source": "TextBoxTool.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "writes text elements"
+    },
+    {
+      "source": "ImageInsertTool.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "writes image elements"
+    },
+    {
+      "source": "SearchPanel.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads/writes search state"
+    },
+    {
+      "source": "SearchPanel.tsx",
+      "target": "pdf-renderer.ts",
+      "type": "imports",
+      "label": "executes search via"
+    },
+    {
+      "source": "SearchPanel.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "loads document via"
+    },
+    {
+      "source": "SearchHighlightLayer.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads search results"
+    },
+    {
+      "source": "SaveDialog.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "reads all modifications"
+    },
+    {
+      "source": "SaveDialog.tsx",
+      "target": "ipc-bridge",
+      "type": "uses",
+      "label": "saves via"
+    },
+    {
+      "source": "OCRDialog.tsx",
+      "target": "usePDFStore.ts",
+      "type": "imports",
+      "label": "writes OCR results"
+    },
+    {
+      "source": "OCRDialog.tsx",
+      "target": "tesseract.js",
+      "type": "depends-on",
+      "label": "processes with"
+    },
+    {
+      "source": "pdf-renderer.ts",
+      "target": "pdfjs-dist",
+      "type": "depends-on",
+      "label": "wraps"
+    },
+    {
+      "source": "usePDFStore.ts",
+      "target": "zustand",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "usePDFStore.ts",
+      "target": "state-management",
+      "type": "implements",
+      "label": "provides"
+    },
+    {
+      "source": "ocr-worker.ts",
+      "target": "tesseract.js",
+      "type": "depends-on",
+      "label": "uses"
+    },
+    {
+      "source": "ipc-bridge",
+      "target": "main-process",
+      "type": "connects-to",
+      "label": "routes to"
+    },
+    {
+      "source": "ipc-bridge",
+      "target": "renderer-process",
+      "type": "connects-to",
+      "label": "routes from"
+    },
+    {
+      "source": "App.tsx",
+      "target": "react",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "Toolbar.tsx",
+      "target": "react",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "Sidebar.tsx",
+      "target": "react",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "PDFViewer.tsx",
+      "target": "react",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "AnnotationLayer.tsx",
+      "target": "react",
+      "type": "depends-on",
+      "label": "built with"
+    },
+    {
+      "source": "main.ts",
+      "target": "file-service.ts",
+      "type": "delegates-to",
+      "label": "file operations"
+    },
+    {
+      "source": "main.ts",
+      "target": "pdf-service.ts",
+      "type": "delegates-to",
+      "label": "PDF operations"
+    },
+    {
+      "source": "SaveDialog.tsx",
+      "target": "pdf-service.ts",
+      "type": "triggers",
+      "label": "applyModifications via IPC"
+    },
+    {
+      "source": "TextEditLayer.tsx",
+      "target": "pdf-service.ts",
+      "type": "triggers",
+      "label": "getPageStructuredText via IPC"
+    },
+    {
+      "source": "ThumbnailsPanel.tsx",
+      "target": "pdf-service.ts",
+      "type": "triggers",
+      "label": "reorderPages via IPC"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "document-loading",
+      "name": "Document Loading Sequence",
+      "steps": [
+        "User clicks Open PDF (Toolbar)",
+        "window.electronAPI.openFile() via IPC",
+        "Main process shows file dialog",
+        "FileService.getFileInfo() returns metadata",
+        "Store.setCurrentDocument() updates state",
+        "PDFViewer effect triggers",
+        "window.electronAPI.readFile() fetches PDF bytes",
+        "PDFRenderer.loadDocument(ArrayBuffer) initializes PDF.js",
+        "PDFRenderer.getPageCount() updates store",
+        "PDFRenderer.renderPage() draws to canvas",
+        "Overlay layers mount and render"
+      ],
+      "involved_nodes": [
+        "Toolbar.tsx",
+        "ipc-bridge",
+        "main.ts",
+        "file-service.ts",
+        "usePDFStore.ts",
+        "PDFViewer.tsx",
+        "pdf-renderer.ts"
+      ]
+    },
+    {
+      "id": "save-export",
+      "name": "Save/Export Sequence",
+      "steps": [
+        "User clicks Save (Toolbar)",
+        "SaveDialog opens",
+        "User selects pages (all or range)",
+        "Dialog gathers modifications from store",
+        "window.electronAPI.saveFile() shows save dialog",
+        "(Optional) extractPages() for page selection",
+        "window.electronAPI.applyModifications() via IPC",
+        "Main process PDFService.applyModificationsToPDF()",
+        "If textEdits exist → applyTextEditsToPDF() first",
+        "Load modified PDF with pdf-lib",
+        "Iterate pages and draw modifications",
+        "Save to outputPath",
+        "Toast notification shows success"
+      ],
+      "involved_nodes": [
+        "Toolbar.tsx",
+        "SaveDialog.tsx",
+        "usePDFStore.ts",
+        "ipc-bridge",
+        "main.ts",
+        "pdf-service.ts",
+        "pdf-lib",
+        "mupdf"
+      ]
+    },
+    {
+      "id": "annotation-creation",
+      "name": "Annotation Creation",
+      "steps": [
+        "User selects annotation tool (Toolbar)",
+        "Store.setCurrentTool(toolId)",
+        "AnnotationLayer receives tool change",
+        "User drags on canvas (MouseDown, MouseMove, MouseUp)",
+        "annotationService.createAnnotation() generates data",
+        "Store.addAnnotation() updates Map",
+        "AnnotationLayer re-renders with new annotation",
+        "SVG element drawn on overlay"
+      ],
+      "involved_nodes": [
+        "Toolbar.tsx",
+        "usePDFStore.ts",
+        "AnnotationLayer.tsx",
+        "annotation-service.ts"
+      ]
+    },
+    {
+      "id": "text-editing",
+      "name": "Text Editing (Foxit-style)",
+      "steps": [
+        "User selects Edit Text tool",
+        "TextEditLayer mounts",
+        "Fetch structured text via window.electronAPI.getPageStructuredText()",
+        "Main process calls mupdf",
+        "Returns array of {text, bbox, font}",
+        "Render transparent clickable overlays",
+        "User clicks text line",
+        "Input field appears with original text",
+        "User edits, presses Enter or blur",
+        "Store.addTextEdit() or updateTextEdit()",
+        "Overlay shows white background + new text",
+        "On Save: textEdits sent to PDFService.applyTextEditsToPDF()"
+      ],
+      "involved_nodes": [
+        "Toolbar.tsx",
+        "usePDFStore.ts",
+        "TextEditLayer.tsx",
+        "ipc-bridge",
+        "main.ts",
+        "pdf-service.ts",
+        "mupdf"
+      ]
+    },
+    {
+      "id": "search-execution",
+      "name": "Search Execution",
+      "steps": [
+        "User enters query in SearchPanel",
+        "Presses Enter",
+        "Create temporary PDFRenderer",
+        "Load document from electronAPI.readFile()",
+        "Call renderer.searchText(query)",
+        "Iterates all pages",
+        "Extracts text content with positions",
+        "Regex matches query",
+        "Returns SearchResult[]",
+        "Store.setSearchResults(results)",
+        "SearchHighlightLayer renders yellow rectangles",
+        "User navigates results with Next/Previous",
+        "Store.setCurrentPage() jumps to match"
+      ],
+      "involved_nodes": [
+        "SearchPanel.tsx",
+        "pdf-renderer.ts",
+        "usePDFStore.ts",
+        "SearchHighlightLayer.tsx",
+        "ipc-bridge"
+      ]
+    }
+  ],
+  "architecture_layers": {
+    "electron_main": {
+      "description": "Main process - privileged backend",
+      "files": [
+        "main.ts",
+        "preload.ts",
+        "file-service.ts",
+        "pdf-service.ts"
+      ],
+      "responsibilities": [
+        "Window management",
+        "IPC handling",
+        "File system operations",
+        "PDF manipulation"
+      ]
+    },
+    "electron_renderer": {
+      "description": "Renderer process - sandboxed UI",
+      "files": [
+        "App.tsx",
+        "Toolbar.tsx",
+        "Sidebar.tsx",
+        "PDFViewer.tsx",
+        "All component files"
+      ],
+      "responsibilities": [
+        "User interface",
+        "User interaction",
+        "Visual rendering",
+        "State management"
+      ]
+    },
+    "shared_services": {
+      "description": "Business logic services",
+      "files": [
+        "pdf-renderer.ts",
+        "annotation-service.ts",
+        "ocr-service.ts"
+      ],
+      "responsibilities": [
+        "PDF.js wrapper",
+        "Annotation management",
+        "OCR coordination"
+      ]
+    },
+    "web_workers": {
+      "description": "Background processing",
+      "files": [
+        "ocr-worker.ts"
+      ],
+      "responsibilities": [
+        "OCR processing",
+        "Non-blocking computation"
+      ]
+    }
+  },
+  "key_patterns": {
+    "process_isolation": {
+      "description": "Main process handles privileged operations, renderer handles UI",
+      "security": "high"
+    },
+    "state_management": {
+      "description": "Single Zustand store with immutable updates",
+      "pattern": "flux-like"
+    },
+    "layer_composition": {
+      "description": "Absolute positioned overlay layers for visual separation",
+      "layers": [
+        "PDF canvas (base)",
+        "Search highlights",
+        "Annotations",
+        "Text/image overlays",
+        "Text editing"
+      ]
+    },
+    "service_abstraction": {
+      "description": "Singleton services for shared business logic",
+      "singletons": [
+        "PDFRenderer",
+        "annotationService",
+        "ocrService"
+      ]
+    },
+    "ipc_security": {
+      "description": "Whitelist-based API with context isolation",
+      "security_features": [
+        "Context isolation",
+        "No node integration",
+        "Preload script API",
+        "No remote module"
+      ]
+    }
+  },
+  "security_checklist": {
+    "enabled": [
+      "Context isolation",
+      "Node integration disabled",
+      "Preload script whitelist API",
+      "No remote module usage",
+      "File operations through IPC only"
+    ],
+    "improvements_needed": [
+      "Add certificate pinning",
+      "Bundle PDF.js worker locally",
+      "Implement code signing",
+      "Add IPC input validation",
+      "Implement file size limits"
+    ]
+  },
+  "metrics": {
+    "total_files": 49,
+    "typescript_files": 40,
+    "main_process_files": 4,
+    "renderer_files": 24,
+    "service_files": 3,
+    "worker_files": 1,
+    "test_files": 5,
+    "config_files": 7,
+    "estimated_loc": 5200,
+    "ipc_channels": 19,
+    "state_actions": 31,
+    "annotation_types": 11,
+    "overlay_layers": 5
+  }
+}
