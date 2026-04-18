@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import 'fake-indexeddb/auto';
 
 // Mock ResizeObserver (needed by Radix UI components)
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
