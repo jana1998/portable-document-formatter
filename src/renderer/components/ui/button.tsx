@@ -3,25 +3,28 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@renderer/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-button text-sm font-medium tracking-tight ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-[0_14px_28px_rgba(13,148,136,0.26)] hover:-translate-y-0.5 hover:bg-primary/95',
+        // Ink Black Pill - Primary CTA
+        default: 'bg-primary text-primary-foreground border border-primary shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.16)] active:scale-[0.98]',
         destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
-        outline: 'border border-border/80 bg-background/85 shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:bg-accent/10 hover:text-foreground',
+        // Outlined Pill - Secondary CTA
+        outline: 'border-[1.5px] border-foreground bg-card text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:bg-muted/50 active:scale-[0.98]',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'text-muted-foreground hover:bg-secondary/90 hover:text-foreground',
-        toolbar: 'border border-transparent bg-transparent text-muted-foreground hover:border-border/80 hover:bg-background/80 hover:text-foreground',
-        soft: 'bg-primary/10 text-primary hover:bg-primary/15',
-        link: 'text-primary underline-offset-4 hover:underline',
+        ghost: 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+        toolbar: 'border border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/60 hover:text-foreground',
+        // Signal Orange - Consent/Special Actions
+        soft: 'bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_2px_8px_rgba(207,69,0,0.2)]',
+        link: 'text-foreground underline-offset-4 hover:underline font-normal',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 px-3.5 text-xs',
-        lg: 'h-11 px-8',
+        default: 'h-10 px-6 py-1.5',
+        sm: 'h-9 px-5 text-xs',
+        lg: 'h-12 px-10 text-base',
         icon: 'h-10 w-10',
-        toolbar: 'h-10 px-3.5',
+        toolbar: 'h-10 px-4',
       },
     },
     defaultVariants: {
