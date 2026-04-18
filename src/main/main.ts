@@ -3,10 +3,12 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PDFService } from './services/pdf-service';
 import { FileService } from './services/file-service';
+import { MarkItDownService } from './services/markitdown-service';
 
 let mainWindow: BrowserWindow | null = null;
 const pdfService = new PDFService();
 const fileService = new FileService();
+const markItDownService = new MarkItDownService();
 
 function createWindow() {
   // Determine icon path based on environment
@@ -46,9 +48,18 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow();
   setupIPCHandlers();
+
+  // Start MarkItDown service
+  try {
+    await markItDownService.start();
+    console.log('[Main] MarkItDown service started successfully');
+  } catch (error) {
+    console.error('[Main] Failed to start MarkItDown service:', error);
+    // Continue without MarkItDown - app can still work with Tesseract fallback
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -60,6 +71,24 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', async (event) => {
+  // Prevent quit until cleanup is done
+  if (markItDownService.isServiceRunning()) {
+    event.preventDefault();
+    console.log('[Main] Shutting down MarkItDown service...');
+
+    try {
+      await markItDownService.stop();
+      console.log('[Main] MarkItDown service stopped successfully');
+    } catch (error) {
+      console.error('[Main] Error stopping MarkItDown service:', error);
+    } finally {
+      // Now allow quit
+      app.exit();
+    }
   }
 });
 
@@ -169,6 +198,47 @@ function setupIPCHandlers() {
     } catch (error) {
       console.error('Apply modifications error:', error);
       throw error;
+    }
+  });
+
+  // MarkItDown operations
+  ipcMain.handle('document:convert', async (_, request: { filePath: string; fileType?: string; options?: any }) => {
+    try {
+      if (!markItDownService.isServiceRunning()) {
+        throw new Error('MarkItDown service is not running');
+      }
+
+      const result = await markItDownService.convertDocument(request);
+      return result;
+    } catch (error) {
+      console.error('Document conversion error:', error);
+      return {
+        success: false,
+        markdown: '',
+        error: String(error),
+      };
+    }
+  });
+
+  ipcMain.handle('markitdown:health', async () => {
+    try {
+      const status = markItDownService.getStatus();
+      const health = markItDownService.getHealthStatus();
+
+      return {
+        ...status,
+        health,
+      };
+    } catch (error) {
+      console.error('Health check error:', error);
+      return {
+        isRunning: false,
+        port: 0,
+        uptime: 0,
+        restartAttempts: 0,
+        health: null,
+        error: String(error),
+      };
     }
   });
 }

@@ -6,6 +6,8 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Circle,
   FileEdit,
   FileText,
@@ -15,8 +17,6 @@ import {
   MessageSquare,
   Minus,
   Moon,
-  PanelLeft,
-  PanelLeftClose,
   Pencil,
   Pointer,
   RotateCw,
@@ -60,12 +60,12 @@ export function Toolbar() {
     totalPages,
     scale,
     rotation,
-    isSidebarOpen,
+    isToolbarCollapsed,
     isDarkMode,
     setCurrentPage,
     setScale,
     setRotation,
-    setIsSidebarOpen,
+    setIsToolbarCollapsed,
     setCurrentTool,
     currentTool,
     setSidebarTab,
@@ -102,55 +102,41 @@ export function Toolbar() {
   return (
     <>
       <header className="toolbar-shell">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_24px_rgba(13,148,136,0.28)]">
+        {/* Top Row: Branding & Primary Actions */}
+        <div className="flex min-w-0 items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-button bg-primary text-primary-foreground shadow-[0_4px_16px_rgba(0,0,0,0.12)]">
               <FileText className="h-5 w-5" />
             </div>
 
-            {currentDocument ? (
-              <ToolbarButton label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}>
-                <Button
-                  variant="toolbar"
-                  size="icon"
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  aria-label="Toggle sidebar"
-                >
-                  {isSidebarOpen ? (
-                    <PanelLeftClose className="h-4 w-4" />
-                  ) : (
-                    <PanelLeft className="h-4 w-4" />
-                  )}
-                </Button>
-              </ToolbarButton>
-            ) : null}
-
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                Portable Document Formatter
+              <p className="text-xs font-bold uppercase tracking-[0.04em] text-muted-foreground">
+                • PDF Editor
               </p>
-              <p className="truncate text-sm font-semibold text-foreground">
-                {currentDocument?.name ?? 'Production PDF workspace'}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{documentDetails}</p>
+              <h1 className="truncate text-base font-medium tracking-tight text-foreground">
+                {currentDocument?.name ?? 'Production Workspace'}
+              </h1>
+              {!isToolbarCollapsed && (
+                <p className="truncate text-xs font-normal text-muted-foreground">{documentDetails}</p>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
-              size="toolbar"
+              size="default"
               onClick={handleOpenFile}
               className="gap-2"
               aria-label="Open PDF"
             >
               <FileUp className="h-4 w-4" />
-              <span>Open PDF</span>
+              <span className="hidden sm:inline">Open PDF</span>
             </Button>
 
             {currentDocument ? (
               <ToolbarButton label="Save PDF">
                 <Button
-                  variant="soft"
+                  variant="outline"
                   size="icon"
                   onClick={() => setSaveDialogOpen(true)}
                   aria-label="Save PDF"
@@ -160,9 +146,11 @@ export function Toolbar() {
               </ToolbarButton>
             ) : null}
 
+            <div className="h-6 w-px bg-border/50" />
+
             <ToolbarButton label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
               <Button
-                variant={isDarkMode ? 'soft' : 'toolbar'}
+                variant="toolbar"
                 size="icon"
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 aria-label="Toggle dark mode"
@@ -170,13 +158,32 @@ export function Toolbar() {
                 {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
             </ToolbarButton>
+
+            {currentDocument ? (
+              <>
+                <div className="h-6 w-px bg-border/50" />
+                <ToolbarButton label={isToolbarCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}>
+                  <Button
+                    variant="toolbar"
+                    size="icon"
+                    onClick={() => setIsToolbarCollapsed(!isToolbarCollapsed)}
+                    aria-label="Toggle toolbar"
+                  >
+                    {isToolbarCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                  </Button>
+                </ToolbarButton>
+              </>
+            ) : null}
           </div>
         </div>
 
-        {currentDocument ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+        {/* Bottom Row: Document Controls (only when document is loaded and toolbar is not collapsed) */}
+        {currentDocument && !isToolbarCollapsed ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-4">
+            {/* Left: Navigation & View Controls */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              {/* Page Navigation Pill */}
+              <div className="flex items-center gap-1.5 rounded-pill border border-border/50 bg-muted/60 p-1.5">
                 <ToolbarButton label="Previous page">
                   <Button
                     variant="toolbar"
@@ -189,7 +196,7 @@ export function Toolbar() {
                   </Button>
                 </ToolbarButton>
 
-                <div className="meta-pill min-w-[92px] justify-center text-foreground">
+                <div className="flex min-w-[100px] items-center justify-center rounded-full bg-background/80 px-4 py-1.5 text-sm font-semibold text-foreground">
                   {`${currentPage} / ${totalPages}`}
                 </div>
 
@@ -206,7 +213,8 @@ export function Toolbar() {
                 </ToolbarButton>
               </div>
 
-              <div className="flex items-center gap-2 rounded-[1.2rem] border border-border/70 bg-background/70 px-3 py-2">
+              {/* Zoom Controls Pill */}
+              <div className="flex items-center gap-2 rounded-pill border border-border/50 bg-muted/60 px-3 py-2">
                 <ToolbarButton label="Zoom out">
                   <Button
                     variant="toolbar"
@@ -229,7 +237,7 @@ export function Toolbar() {
                   />
                 </div>
 
-                <span className="min-w-[48px] text-sm font-semibold text-foreground">
+                <span className="min-w-[52px] text-center text-sm font-semibold text-foreground">
                   {Math.round(scale * 100)}%
                 </span>
 
@@ -246,17 +254,16 @@ export function Toolbar() {
               </div>
             </div>
 
+            {/* Right: Tool Groups */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              {/* Editing Tools Pill */}
+              <div className="flex items-center gap-1 rounded-pill border border-border/50 bg-muted/60 p-1.5">
                 {toolOptions.map(({ id, label, icon: Icon }) => (
                   <ToolbarButton key={id} label={label}>
                     <Button
                       variant={currentTool === id ? 'default' : 'toolbar'}
                       size="icon"
                       onClick={() => setCurrentTool(id)}
-                      className={cn(
-                        currentTool === id && 'shadow-[0_10px_24px_rgba(13,148,136,0.2)]'
-                      )}
                       aria-label={label}
                     >
                       <Icon className="h-4 w-4" />
@@ -265,16 +272,14 @@ export function Toolbar() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              {/* Annotation Tools Pill */}
+              <div className="flex items-center gap-1 rounded-pill border border-border/50 bg-muted/60 p-1.5">
                 {annotationTools.map(({ id, label, icon: Icon }) => (
                   <ToolbarButton key={id} label={label}>
                     <Button
                       variant={currentTool === id ? 'default' : 'toolbar'}
                       size="icon"
                       onClick={() => setCurrentTool(id)}
-                      className={cn(
-                        currentTool === id && 'shadow-[0_10px_24px_rgba(13,148,136,0.2)]'
-                      )}
                       aria-label={label}
                     >
                       <Icon className="h-4 w-4" />
@@ -283,7 +288,8 @@ export function Toolbar() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              {/* Utility Tools Pill */}
+              <div className="flex items-center gap-1 rounded-pill border border-border/50 bg-muted/60 p-1.5">
                 <ToolbarButton label="Search document">
                   <Button
                     variant="toolbar"

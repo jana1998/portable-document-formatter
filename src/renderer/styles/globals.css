@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;450;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,48 +6,64 @@
 
 @layer base {
   :root {
-    --background: 174 55% 97%;
-    --foreground: 179 48% 16%;
-    --card: 0 0% 100%;
-    --card-foreground: 179 48% 16%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 179 48% 16%;
-    --primary: 175 84% 32%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 173 33% 93%;
-    --secondary-foreground: 179 48% 18%;
-    --muted: 173 37% 95%;
-    --muted-foreground: 181 16% 38%;
-    --accent: 24 95% 56%;
-    --accent-foreground: 24 93% 15%;
+    /* Mastercard-inspired color system */
+    /* Canvas Cream #F3F0EE = 24° 17% 95% */
+    --background: 24 17% 95%;
+    /* Ink Black #141413 = 60° 4% 8% */
+    --foreground: 60 4% 8%;
+    /* Lifted Cream #FCFBFA = 30° 33% 98% */
+    --card: 30 33% 98%;
+    --card-foreground: 60 4% 8%;
+    --popover: 30 33% 98%;
+    --popover-foreground: 60 4% 8%;
+    /* Ink Black for primary buttons */
+    --primary: 60 4% 8%;
+    /* Canvas Cream for button text */
+    --primary-foreground: 24 17% 95%;
+    /* Soft Bone #F4F4F4 */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 60 4% 8%;
+    /* Canvas Cream slightly darker for muted */
+    --muted: 24 12% 92%;
+    /* Slate Gray #696969 */
+    --muted-foreground: 0 0% 41%;
+    /* Signal Orange #CF4500 = 18° 100% 41% */
+    --accent: 18 100% 41%;
+    /* Canvas Cream for accent foreground */
+    --accent-foreground: 24 17% 95%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 174 25% 84%;
-    --input: 173 29% 88%;
-    --ring: 175 84% 32%;
-    --radius: 1rem;
+    /* Dust Taupe #D1CDC7 for borders */
+    --border: 30 10% 82%;
+    --input: 30 10% 82%;
+    /* Ink Black for focus rings */
+    --ring: 60 4% 8%;
+    --radius: 1.25rem;
   }
 
   .dark {
-    --background: 189 36% 10%;
-    --foreground: 210 40% 98%;
-    --card: 188 34% 14%;
-    --card-foreground: 210 40% 98%;
-    --popover: 188 34% 14%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 173 66% 46%;
-    --primary-foreground: 180 100% 8%;
-    --secondary: 188 24% 19%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 188 22% 17%;
-    --muted-foreground: 181 13% 70%;
-    --accent: 24 95% 56%;
-    --accent-foreground: 24 93% 12%;
+    /* Dark mode: Deep warm blacks */
+    --background: 210 25% 10%;
+    --foreground: 30 33% 98%;
+    --card: 210 20% 14%;
+    --card-foreground: 30 33% 98%;
+    --popover: 210 20% 14%;
+    --popover-foreground: 30 33% 98%;
+    /* Lighter ink for dark mode buttons */
+    --primary: 60 4% 15%;
+    --primary-foreground: 30 33% 98%;
+    --secondary: 210 15% 19%;
+    --secondary-foreground: 30 33% 98%;
+    --muted: 210 18% 17%;
+    --muted-foreground: 0 0% 70%;
+    /* Signal Orange stays the same */
+    --accent: 18 100% 41%;
+    --accent-foreground: 30 33% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 188 19% 25%;
-    --input: 188 19% 25%;
-    --ring: 173 66% 46%;
+    --border: 210 15% 25%;
+    --input: 210 15% 25%;
+    --ring: 60 4% 15%;
   }
 }
 
@@ -64,19 +80,21 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Inter', 'Arial', sans-serif;
+    font-weight: 450;
+    letter-spacing: normal;
     background-image:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 28%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 24%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.96) 100%);
+      radial-gradient(circle at top left, rgba(243, 115, 56, 0.08), transparent 28%),
+      radial-gradient(circle at top right, rgba(207, 69, 0, 0.06), transparent 24%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.98) 100%);
   }
 
   .dark body {
     background-image:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 30%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 22%),
-      radial-gradient(circle at bottom center, rgba(14, 165, 233, 0.08), transparent 28%),
-      linear-gradient(180deg, rgba(3, 13, 18, 0.98) 0%, rgba(7, 20, 28, 1) 52%, rgba(2, 8, 14, 1) 100%);
+      radial-gradient(circle at top left, rgba(243, 115, 56, 0.1), transparent 30%),
+      radial-gradient(circle at top right, rgba(207, 69, 0, 0.08), transparent 22%),
+      radial-gradient(circle at bottom center, rgba(20, 20, 19, 0.12), transparent 28%),
+      linear-gradient(180deg, rgba(20, 20, 19, 0.96) 0%, rgba(15, 15, 14, 0.98) 52%, rgba(10, 10, 9, 1) 100%);
   }
 
   ::selection {
@@ -109,23 +127,23 @@
   }
 
   .toolbar-shell {
-    @apply relative z-10 flex flex-col gap-3 rounded-[1.5rem] border border-white/60 bg-white/80 px-4 py-3 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70;
+    @apply relative z-10 flex flex-col gap-3 rounded-[2.5rem] border border-border/40 bg-card/95 px-6 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-border/20 dark:bg-card/85;
   }
 
   .panel-surface {
-    @apply rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70;
+    @apply rounded-[2.5rem] border border-border/40 bg-card/95 shadow-[0_4px_24px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-border/20 dark:bg-card/85;
   }
 
   .panel-muted {
-    @apply rounded-[1.25rem] border border-border/70 bg-background/70;
+    @apply rounded-[1.25rem] border border-border/50 bg-muted/70;
   }
 
   .meta-pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-semibold text-muted-foreground;
+    @apply inline-flex items-center gap-2 rounded-full border border-border/50 bg-muted/85 px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground;
   }
 
   .viewer-stage {
-    @apply relative overflow-auto rounded-[1.75rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(240,253,250,0.96))] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.76),rgba(3,7,18,0.92))] sm:p-6;
+    @apply relative overflow-auto rounded-[2.5rem] border border-border/40 bg-[linear-gradient(180deg,rgba(252,251,250,0.85),rgba(243,240,238,0.95))] p-6 shadow-[0_24px_48px_rgba(0,0,0,0.08)] dark:border-border/20 dark:bg-[linear-gradient(180deg,rgba(20,20,19,0.75),rgba(15,15,14,0.90))] sm:p-8;
   }
 
   .viewer-grid {
@@ -142,19 +160,19 @@
   }
 
   .landing-stage {
-    @apply relative flex h-full min-h-[560px] items-center justify-center overflow-hidden rounded-[1.75rem];
+    @apply relative flex h-full min-h-[560px] items-center justify-center overflow-hidden rounded-[2.5rem];
     background:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 32%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 28%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(240, 253, 250, 0.94));
+      radial-gradient(circle at top left, rgba(243, 115, 56, 0.12), transparent 32%),
+      radial-gradient(circle at top right, rgba(207, 69, 0, 0.10), transparent 28%),
+      linear-gradient(180deg, rgba(252, 251, 250, 0.78), rgba(243, 240, 238, 0.96));
   }
 
   .dark .landing-stage {
     background:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 28%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 24%),
-      radial-gradient(circle at bottom center, rgba(14, 165, 233, 0.08), transparent 26%),
-      linear-gradient(180deg, rgba(8, 19, 27, 0.94), rgba(3, 10, 17, 0.98));
+      radial-gradient(circle at top left, rgba(243, 115, 56, 0.14), transparent 28%),
+      radial-gradient(circle at top right, rgba(207, 69, 0, 0.10), transparent 24%),
+      radial-gradient(circle at bottom center, rgba(20, 20, 19, 0.12), transparent 26%),
+      linear-gradient(180deg, rgba(20, 20, 19, 0.92), rgba(15, 15, 14, 0.96));
   }
 
   .landing-stage::before,
@@ -322,12 +340,12 @@ textarea,
 [data-state],
 [data-radix-collection-item] {
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease,
-    opacity 180ms ease,
-    transform 180ms ease;
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
 }
 
 /* Scrollbar styling */

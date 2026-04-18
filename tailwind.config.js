@@ -52,6 +52,11 @@ module.exports = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        // Mastercard-inspired radius scale
+        'pill': '999px',
+        'stadium': '2.5rem', // 40px
+        'button': '1.25rem', // 20px
+        'chip': '1.5rem', // 24px
       },
       keyframes: {
         'accordion-down': {
