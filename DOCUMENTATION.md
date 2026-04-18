@@ -17,7 +17,7 @@
    - [Annotation System](#annotation-system)
    - [Text and Image Editing](#text-and-image-editing)
    - [Search Functionality](#search-functionality)
-   - [OCR Processing](#ocr-processing)
+   - [OCR and Multi-Format Extraction (Phase 1)](#ocr-and-multi-format-extraction-phase-1)
    - [Save and Export](#save-and-export)
    - [UI/UX Features](#uiux-features)
 
@@ -40,7 +40,11 @@ graph TB
         State[Zustand State Store]
         Services[Renderer Services]
         PDFRenderer[PDF.js Renderer]
-        OCREngine[Tesseract.js OCR]
+        ExtractionEngine[MarkItDown / Tesseract.js]
+    end
+
+    subgraph "Phase 1: Foundation & Migration"
+        MID[MarkItDown Microservice]
     end
 
     subgraph "IPC Bridge"
@@ -51,6 +55,7 @@ graph TB
         MainEntry[Electron Main]
         FileService[File Operations]
         PDFService[PDF Manipulation]
+        ExtractionService[MarkItDown Service]
         WindowMgmt[Window Management]
         DialogSystem[Native Dialogs]
     end
@@ -59,22 +64,27 @@ graph TB
         FileSystem[(File System)]
         PDFFiles[(PDF Documents)]
         Annotations[(Annotation Data)]
+        Cache[(Result Cache)]
     end
 
     User --> UI
     UI <--> State
     UI --> Services
     Services --> PDFRenderer
-    Services --> OCREngine
+    Services --> ExtractionEngine
+    ExtractionEngine -.-> MID
     UI <--> Preload
     Preload <--> MainEntry
     MainEntry --> FileService
     MainEntry --> PDFService
+    MainEntry --> ExtractionService
+    ExtractionService <--> MID
     MainEntry --> WindowMgmt
     MainEntry --> DialogSystem
     FileService <--> FileSystem
     PDFService <--> PDFFiles
     FileService <--> Annotations
+    ExtractionService <--> Cache
 
     style Preload fill:#ff6b6b,stroke:#c92a2a,stroke-width:3px
     style MainEntry fill:#339af0,stroke:#1864ab,stroke-width:2px
@@ -1268,168 +1278,136 @@ interface SearchResult {
 
 ---
 
-### OCR Processing
+### OCR and Multi-Format Extraction (Phase 1)
 
-Extract text from scanned PDFs and images using Tesseract.js OCR engine.
+Extract structured text from a wide range of document formats using the **MarkItDown** engine and the **Strategy Pattern** architecture.
 
+#### Overview
+Phase 1 introduces a major upgrade to the document extraction system. Instead of relying solely on client-side OCR for PDFs, the application now supports multiple formats and leverages a dedicated Python-based microservice for high-fidelity Markdown extraction.
+
+#### Supported Formats
+- **PDF**: Advanced layout preservation and text extraction.
+- **Office Documents**: `.docx`, `.pptx`, `.xlsx`.
+- **Images**: `.jpg`, `.png`, `.tiff` (via OCR).
+- **Other**: `.html`, `.csv`, `.md`.
+
+#### Architecture: Strategy Pattern
+The extraction system uses the Strategy Pattern to dynamically select the most appropriate processor:
+
+1. **MarkItDownProcessor**: The primary processor, which communicates with a FastAPI microservice. It is ideal for structured documents and multi-format support.
+2. **TesseractProcessor**: A fallback processor that uses `Tesseract.js` for local OCR on images or when the microservice is unavailable.
+
+#### Process Flow (MarkItDown)
 ```mermaid
 sequenceDiagram
     participant U as User
     participant UI as OCR Dialog
-    participant Canvas as PDF Canvas
-    participant Worker as OCR Worker
-    participant Tess as Tesseract.js
-    participant Store as Store
+    participant Main as Electron Main
+    participant Svc as MarkItDown Service (Python)
+    participant DB as IndexedDB (Dexie)
 
-    Note over U,Store: OCR Processing Flow
-    U->>UI: Click OCR Button
-    UI->>UI: Show OCR Dialog
-    U->>UI: Select "Current Page" or "All Pages"
-
-    alt Current Page Only
-        UI->>Canvas: Get visible canvas
-        Canvas-->>UI: Canvas image data
-    else All Pages
-        loop For each page
-            UI->>Canvas: Render page offscreen
-            Canvas-->>UI: Canvas image data
-        end
+    U->>UI: Request Extraction
+    UI->>DB: Check Cache (hash_processor)
+    alt Cache Hit
+        DB-->>UI: Return Cached Markdown
+    else Cache Miss
+        UI->>Main: document:convert(file)
+        Main->>Svc: POST /convert
+        Svc->>Svc: Process with MarkItDown
+        Svc-->>Main: Return Markdown
+        Main-->>UI: Return Markdown
+        UI->>DB: Cache Result
     end
-
-    UI->>Worker: Start OCR processing
-    Worker->>Tess: Initialize Tesseract
-    Tess-->>Worker: Ready
-
-    loop For each image
-        Worker->>Tess: recognize(imageData)
-        Tess->>Tess: Process image
-        Tess-->>Worker: { text, confidence, words }
-        Worker->>UI: Progress update
-        UI->>UI: Update progress bar
-    end
-
-    Worker-->>UI: OCR complete
-    UI->>Store: Save OCR results
-    Store->>Store: Update ocrResults map
-    UI->>UI: Display extracted text
-    U->>UI: Copy or export text
+    UI->>U: Display Markdown Result
 ```
 
-**OCR Architecture:**
+#### Result Persistence
+All extraction results are cached locally using **IndexedDB (Dexie.js)**. The cache key is generated based on a composite of the file path, size, and modification time to ensure that results are reused correctly across sessions while still reflecting any changes to the source document.
 
-```mermaid
-graph TB
-    subgraph "OCR Processing Pipeline"
+---
+    subgraph "Multi-Format Extraction Pipeline"
         direction TB
 
         subgraph "Input Stage"
-            PDFPage[PDF Page]
-            CanvasRender[Render to Canvas]
-            ImageData[Get Image Data]
+            DocFile[Document File<br/>.pdf, .docx, .pptx, etc.]
+            ProcessorSelect[Strategy Selection]
         end
 
-        subgraph "Pre-Processing"
-            Grayscale[Convert to Grayscale]
-            Contrast[Enhance Contrast]
-            Denoise[Noise Reduction]
-            Deskew[Deskew]
+        subgraph "Extraction Stage"
+            MIDEngine[MarkItDown Service]
+            TessEngine[Tesseract Fallback]
+            FastAPI[FastAPI Server]
         end
 
-        subgraph "OCR Engine"
-            TessInit[Initialize Tesseract]
-            LoadLang[Load Language Data]
-            Recognize[Text Recognition]
-            Confidence[Confidence Scoring]
+        subgraph "Processing"
+            Conversion[Markdown Conversion]
+            LayoutPreserve[Layout Preservation]
+            Metadata[Metadata Extraction]
         end
 
-        subgraph "Post-Processing"
-            TextFormat[Format Text]
-            WordBounds[Word Boundaries]
-            Layout[Layout Analysis]
+        subgraph "Persistence"
+            ResultCache[IndexedDB Cache]
+            StoreResult[Update Store]
         end
 
         subgraph "Output Stage"
-            Results[OCR Results]
-            Display[Display in Dialog]
-            Store[Save to Store]
-            Export[Export as TXT]
+            MarkdownOut[Structured Markdown]
+            PreviewUI[Markdown Preview UI]
+            ExportMD[Export as MD/JSON]
         end
     end
 
-    PDFPage --> CanvasRender
-    CanvasRender --> ImageData
-    ImageData --> Grayscale
+    DocFile --> ProcessorSelect
+    ProcessorSelect --> MIDEngine
+    ProcessorSelect --> TessEngine
+    
+    MIDEngine --> FastAPI
+    FastAPI --> Conversion
+    
+    Conversion --> LayoutPreserve
+    LayoutPreserve --> ResultCache
+    
+    ResultCache --> StoreResult
+    StoreResult --> MarkdownOut
+    MarkdownOut --> PreviewUI
+    MarkdownOut --> ExportMD
 
-    Grayscale --> Contrast
-    Contrast --> TessInit
-
-    TessInit --> LoadLang
-    LoadLang --> Recognize
-    Recognize --> Confidence
-
-    Confidence --> TextFormat
-    TextFormat --> WordBounds
-    WordBounds --> Results
-
-    Results --> Display
-    Results --> Store
-    Results --> Export
-
-    style TessInit fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px
-    style Recognize fill:#51cf66,stroke:#2b8a3e,stroke-width:2px
-    style Store fill:#339af0,stroke:#1864ab,stroke-width:2px
+    style MIDEngine fill:#339af0,stroke:#1864ab,stroke-width:2px
+    style FastAPI fill:#51cf66,stroke:#2b8a3e,stroke-width:2px
+    style ResultCache fill:#ff922b,stroke:#d9480f,stroke-width:2px
 ```
 
-**OCR Features:**
+**Extraction Features (Phase 1):**
 
 | Feature | Description |
 |---------|-------------|
-| **Single Page OCR** | Process current page only (fast) |
-| **Batch OCR** | Process all pages or range |
-| **Multi-Language** | Support for 100+ languages |
-| **Confidence Score** | Per-word and per-page accuracy |
-| **Progress Indicator** | Real-time processing status |
-| **Word-Level Data** | Individual word positions and bounds |
-| **Copy to Clipboard** | One-click text copy |
-| **Export to File** | Save as .txt file |
+| **Multi-Format** | Support for PDF, DOCX, PPTX, XLSX, HTML, Images |
+| **Markdown Output** | High-fidelity structured Markdown results |
+| **Hybrid Strategy** | Automatic fallback from MarkItDown to Tesseract |
+| **Result Caching** | Persistent cache via IndexedDB (Dexie.js) |
+| **Preview UI** | Real-time Markdown rendering in OCRDialog |
+| **Export Formats** | Export as Markdown, Plain Text, or JSON |
 
-**OCR Result Data:**
+**Extraction Result Data:**
 
 ```typescript
-interface OCRResult {
-  pageNumber: number;
-  text: string;              // Full extracted text
-  confidence: number;         // 0-100 overall confidence
-  words: OCRWord[];
+interface ExtractionResult {
+  id: string;                // File hash + processor
+  text: string;              // Markdown formatted text
+  processor: 'markitdown' | 'tesseract';
   processingTime: number;     // Milliseconds
-  language: string;
-}
-
-interface OCRWord {
-  text: string;
-  confidence: number;
-  bbox: {                    // Bounding box
-    x0: number;
-    y0: number;
-    x1: number;
-    y1: number;
+  timestamp: number;
+  metadata: {
+    format: string;
+    pageCount?: number;
   };
 }
 ```
 
-**Supported Languages:**
-- English (default)
-- Spanish, French, German, Italian
-- Chinese (Simplified & Traditional)
-- Japanese, Korean
-- Arabic, Hebrew, Russian
-- 100+ more languages via Tesseract language packs
-
-**Performance Notes:**
-- **Single Page**: ~2-5 seconds depending on complexity
-- **Batch Processing**: ~3-6 seconds per page
-- **Web Worker**: Non-blocking, UI remains responsive
-- **Image Quality**: Higher DPI = better accuracy but slower
+**Performance & Scalability:**
+- **Microservice Isolation**: Python backend prevents heavy processing from blocking Electron Main/Renderer.
+- **Async Processing**: Subprocess management ensures responsive UI during long conversions.
+- **Cache Hits**: Near-zero latency for previously processed files.
 
 ---
 

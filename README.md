@@ -34,11 +34,12 @@
 - 🖼️ **Image Insertion** — Add images and graphics to your documents
 - 📊 **Non-Destructive Editing** — Original PDFs remain untouched until you save
 
-### 🔎 **Smart Search & OCR**
+### 🔎 **Smart Search & Extraction**
 - 🔍 **Full-Text Search** — Find any text across your entire document
 - 📍 **Result Highlighting** — Visual highlights for all search matches
-- 🤖 **OCR Processing** — Extract text from scanned PDFs and images using Tesseract.js
-- 📄 **Batch OCR** — Process single pages or entire documents at once
+- 🤖 **Multi-Format Extraction** — Extract structured Markdown from PDF, Office docs, and images
+- 🚀 **High-Performance Backend** — Powered by Microsoft MarkItDown via FastAPI microservice
+- 💾 **Result Caching** — Near-instant access to previously processed documents via IndexedDB
 
 ### 💾 **Flexible Export Options**
 - 📑 **Selective Export** — Save specific page ranges (e.g., "1-3, 5, 7-9")
@@ -121,11 +122,12 @@ npm run build
 2. Type your search query
 3. Navigate through results with keyboard shortcuts or the sidebar
 
-### 🤖 Using OCR
-1. Open a scanned PDF or image-based document
-2. Click the **OCR button**
-3. Choose between **current page** or **all pages**
-4. Wait for processing and copy the extracted text
+### 🤖 Document Extraction (OCR & Multi-Format)
+1. Open any document or image (.pdf, .docx, .pptx, .xlsx, .png, .jpg)
+2. Click the **Extraction** button in the toolbar
+3. The system will automatically detect the format and select the best extraction strategy
+4. Preview the structured Markdown results and copy/export as needed
+5. Frequent documents are cached for near-instant access!
 
 ### 💾 Saving Your Work
 1. Click the **save button** in the toolbar
@@ -148,7 +150,10 @@ Built with modern, production-ready technologies:
 | 🧩 **Radix UI** | Accessible component primitives |
 | 📄 **PDF.js** | PDF rendering engine |
 | 📝 **pdf-lib** | PDF manipulation and creation |
-| 🤖 **Tesseract.js** | OCR text extraction |
+| 🤖 **MarkItDown** | Primary multi-format extraction engine |
+| ⚡ **FastAPI** | Python microservice for document processing |
+| 📦 **Dexie.js** | IndexedDB wrapper for result caching |
+| 🤖 **Tesseract.js** | Fallback OCR for local image processing |
 | 🐻 **Zustand** | Lightweight state management |
 | ⚡ **Vite** | Lightning-fast build tool |
 | 🧪 **Vitest** | Modern testing framework |
@@ -203,20 +208,17 @@ portable-document-formatter/
 
 ## 🗺️ Roadmap
 
-### ✅ Completed
-- [x] PDF viewing with zoom and navigation
-- [x] Annotation system with comments
-- [x] Text and image overlays
-- [x] Full-text search with highlighting
-- [x] OCR with Tesseract.js
-- [x] Selective page export
-- [x] Dark mode support
-- [x] Thumbnail navigation
+### 🚧 In Progress (Phase 1: Foundation & Migration)
+- [x] Multi-format extraction (PDF, DOCX, PPTX, XLSX) via Microsoft MarkItDown
+- [x] FastAPI microservice integration
+- [x] Strategy Pattern for pluggable document processors
+- [x] Persistent result caching with IndexedDB (Dexie.js)
+- [ ] Final GA sign-off and stability testing
 
-### 🚧 In Progress
+### 🗺️ Future Roadmap
+- [ ] LLM-assisted document analysis (Phase 2)
 - [ ] Page management (reorder, delete, rotate)
 - [ ] Export to images (PNG/JPEG)
-- [ ] Batch text extraction
 - [ ] Enhanced annotation tools (shapes, arrows)
 
 ### 🔮 Future Plans
@@ -385,7 +387,8 @@ Built with amazing open-source projects:
 - [React](https://reactjs.org/) - UI library
 - [PDF.js](https://mozilla.github.io/pdf.js/) - PDF rendering by Mozilla
 - [pdf-lib](https://pdf-lib.js.org/) - PDF manipulation
-- [Tesseract.js](https://tesseract.projectnaptha.com/) - OCR engine
+- [MarkItDown](https://github.com/microsoft/markitdown) - Primary multi-format extraction engine
+- [Tesseract.js](https://tesseract.projectnaptha.com/) - Fallback OCR engine
 - [Radix UI](https://www.radix-ui.com/) - Accessible components
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
 
