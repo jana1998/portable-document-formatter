@@ -161,3 +161,29 @@ export interface Tool {
   icon: string;
   active: boolean;
 }
+
+export type DocumentFormat =
+  | 'pdf'
+  | 'docx'
+  | 'pptx'
+  | 'xlsx'
+  | 'image'
+  | 'html'
+  | 'epub'
+  | 'txt'
+  | 'unknown';
+
+export interface ConversionResult {
+  success: boolean;
+  format: DocumentFormat;
+  markdown: string;
+  text: string;
+  metadata?: {
+    title?: string;
+    author?: string;
+    pageCount?: number;
+    wordCount?: number;
+    confidence?: number;
+  };
+  error?: string;
+}

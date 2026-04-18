@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { SaveDialog } from '@components/features/pages/SaveDialog';
-import { OCRDialog } from '@components/features/ocr/OCRDialog';
+import { DocumentConverterDialog } from '@components/features/converter';
 import { cn, formatFileSize, formatRelativeTime } from '@renderer/lib/utils';
 
 const toolOptions = [
@@ -73,7 +73,7 @@ export function Toolbar() {
   } = usePDFStore();
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
+  const [converterDialogOpen, setConverterDialogOpen] = useState(false);
 
   const handleOpenFile = async () => {
     try {
@@ -294,10 +294,7 @@ export function Toolbar() {
                   <Button
                     variant="toolbar"
                     size="icon"
-                    onClick={() => {
-                      setSidebarTab('search');
-                      setIsSidebarOpen(true);
-                    }}
+                    onClick={() => setSidebarTab('search')}
                     aria-label="Search document"
                   >
                     <Search className="h-4 w-4" />
@@ -315,12 +312,12 @@ export function Toolbar() {
                   </Button>
                 </ToolbarButton>
 
-                <ToolbarButton label="OCR">
+                <ToolbarButton label="Document Converter">
                   <Button
                     variant="toolbar"
                     size="icon"
-                    onClick={() => setOcrDialogOpen(true)}
-                    aria-label="OCR"
+                    onClick={() => setConverterDialogOpen(true)}
+                    aria-label="Document Converter"
                   >
                     <ScanText className="h-4 w-4" />
                   </Button>
@@ -334,8 +331,8 @@ export function Toolbar() {
       {saveDialogOpen ? (
         <SaveDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen} />
       ) : null}
-      {ocrDialogOpen ? (
-        <OCRDialog open={ocrDialogOpen} onOpenChange={setOcrDialogOpen} />
+      {converterDialogOpen ? (
+        <DocumentConverterDialog open={converterDialogOpen} onOpenChange={setConverterDialogOpen} />
       ) : null}
     </>
   );
