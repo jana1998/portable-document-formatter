@@ -22,6 +22,8 @@ import {
   Save,
   ScanText,
   Search,
+  Settings as SettingsIcon,
+  Sparkles,
   Square,
   Stamp,
   Sun,
@@ -32,6 +34,9 @@ import {
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { SaveDialog } from '@components/features/pages/SaveDialog';
 import { OCRDialog } from '@components/features/ocr/OCRDialog';
+import { ChatPanel } from '@components/features/chat/ChatPanel';
+import { LLMSettingsDialog } from '@components/features/settings/LLMSettingsDialog';
+import { ensureEmbeddingsForDocument } from '@renderer/services/embeddings-indexer';
 import { cn, formatFileSize, formatRelativeTime } from '@renderer/lib/utils';
 
 const toolOptions = [
@@ -72,13 +77,16 @@ export function Toolbar() {
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [llmSettingsOpen, setLlmSettingsOpen] = useState(false);
 
   const handleOpenFile = async () => {
     try {
       const fileInfo = await window.electronAPI.openFile();
       if (!fileInfo) return;
 
-      usePDFStore.getState().setCurrentDocument({
+      const store = usePDFStore.getState();
+      store.setCurrentDocument({
         id: Date.now().toString(),
         name: fileInfo.name,
         path: fileInfo.path,
@@ -86,6 +94,20 @@ export function Toolbar() {
         fileSize: fileInfo.size,
         loadedAt: new Date(),
       });
+
+      // Restore any prior OCR results saved alongside the PDF.
+      try {
+        const sidecar = await window.electronAPI.loadOCRSidecar(fileInfo.path);
+        if (sidecar && sidecar.length > 0) {
+          store.hydrateOCRResults(sidecar);
+        }
+      } catch (ocrErr) {
+        console.warn('OCR sidecar load failed:', ocrErr);
+      }
+
+      // Semantic index: hydrate from sidecar if present, else build in the
+      // background using whatever text we can gather (OCR or pdfjs text layer).
+      void ensureEmbeddingsForDocument(fileInfo.path);
     } catch (error) {
       console.error('Failed to open file:', error);
     }
@@ -317,6 +339,28 @@ export function Toolbar() {
                     <ScanText className="h-4 w-4" />
                   </Button>
                 </ToolbarButton>
+
+                <ToolbarButton label="Chat with PDF">
+                  <Button
+                    variant="toolbar"
+                    size="icon"
+                    onClick={() => setChatOpen(true)}
+                    aria-label="Chat with PDF"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </Button>
+                </ToolbarButton>
+
+                <ToolbarButton label="AI settings">
+                  <Button
+                    variant="toolbar"
+                    size="icon"
+                    onClick={() => setLlmSettingsOpen(true)}
+                    aria-label="AI settings"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                  </Button>
+                </ToolbarButton>
               </div>
             </div>
           </div>
@@ -329,6 +373,8 @@ export function Toolbar() {
       {ocrDialogOpen ? (
         <OCRDialog open={ocrDialogOpen} onOpenChange={setOcrDialogOpen} />
       ) : null}
+      <LLMSettingsDialog open={llmSettingsOpen} onOpenChange={setLlmSettingsOpen} />
+      <ChatPanel open={chatOpen} onOpenChange={setChatOpen} onOpenSettings={() => setLlmSettingsOpen(true)} />
     </>
   );
 }

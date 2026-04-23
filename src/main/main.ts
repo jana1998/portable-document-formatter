@@ -3,10 +3,16 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PDFService } from './services/pdf-service';
 import { FileService } from './services/file-service';
+import { OCRService } from './services/ocr-service';
+import { EmbeddingsService, type PageTextInput } from './services/embeddings-service';
+import { LLMService, type LLMBackend, type LLMGenerateOptions } from './services/llm-service';
 
 let mainWindow: BrowserWindow | null = null;
 const pdfService = new PDFService();
 const fileService = new FileService();
+const ocrService = new OCRService();
+const embeddingsService = new EmbeddingsService();
+const llmService = new LLMService();
 
 function createWindow() {
   // Determine icon path based on environment
@@ -176,4 +182,98 @@ function setupIPCHandlers() {
       throw error;
     }
   });
+
+  // OCR operations — new PaddleOCR-backed pipeline.
+  // Renderer rasterizes each page and ships PNG bytes; text-layer short-circuit
+  // also lives in the renderer (pdfjs-dist is renderer-only).
+  let currentOcrAbort: AbortController | null = null;
+
+  ipcMain.handle(
+    'ocr:recognizePageImage',
+    async (_, pageNumber: number, imageBuffer: Buffer | Uint8Array) => {
+      const bytes = Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
+      currentOcrAbort?.abort();
+      currentOcrAbort = new AbortController();
+      try {
+        return await ocrService.recognizePageImage(pageNumber, bytes, {
+          signal: currentOcrAbort.signal,
+        });
+      } finally {
+        if (currentOcrAbort && !currentOcrAbort.signal.aborted) currentOcrAbort = null;
+      }
+    }
+  );
+
+  ipcMain.handle('ocr:cancel', async () => {
+    currentOcrAbort?.abort();
+    currentOcrAbort = null;
+    return true;
+  });
+
+  ipcMain.handle('ocr:saveSidecar', async (_, pdfPath: string, results: any[]) => {
+    return ocrService.saveSidecar(pdfPath, results);
+  });
+
+  ipcMain.handle('ocr:loadSidecar', async (_, pdfPath: string) => {
+    return ocrService.loadSidecar(pdfPath);
+  });
+
+  // Embeddings (all-MiniLM-L6-v2 via @huggingface/transformers, utilityProcess)
+  ipcMain.handle(
+    'embeddings:embedDocument',
+    async (_, _pdfPath: string, pages: PageTextInput[]) => {
+      return embeddingsService.embedDocument(pages);
+    }
+  );
+
+  ipcMain.handle('embeddings:embedText', async (_, text: string) => {
+    const [vec] = await embeddingsService.embedTexts([text]);
+    return vec ?? null;
+  });
+
+  ipcMain.handle(
+    'embeddings:saveSidecar',
+    async (_, pdfPath: string, embeddings: any[]) => {
+      return embeddingsService.saveSidecar(pdfPath, embeddings);
+    }
+  );
+
+  ipcMain.handle('embeddings:loadSidecar', async (_, pdfPath: string) => {
+    return embeddingsService.loadSidecar(pdfPath);
+  });
+
+  // LLM (Anthropic / OpenAI cloud; local node-llama-cpp scaffolded for v1.1)
+  ipcMain.handle('llm:generate', async (event, prompt: string, options: LLMGenerateOptions) => {
+    return llmService.generate(event.sender, prompt, options ?? {});
+  });
+
+  ipcMain.handle('llm:cancel', async () => {
+    llmService.cancelCurrent();
+    return true;
+  });
+
+  ipcMain.handle('llm:hasApiKey', async (_, backend: 'anthropic' | 'openai') => {
+    return llmService.hasApiKey(backend);
+  });
+
+  ipcMain.handle(
+    'llm:setApiKey',
+    async (_, backend: 'anthropic' | 'openai', key: string | null) => {
+      await llmService.setApiKey(backend, key);
+      return true;
+    }
+  );
+
+  ipcMain.handle('llm:testBackend', async (_, backend: 'anthropic' | 'openai') => {
+    return llmService.testBackend(backend);
+  });
 }
+
+app.on('before-quit', () => {
+  ocrService.shutdown().catch(() => undefined);
+  embeddingsService.shutdown().catch(() => undefined);
+  llmService.cancelCurrent();
+});
+
+// TypeScript: LLMBackend is re-exported only for convenience elsewhere.
+export type { LLMBackend };

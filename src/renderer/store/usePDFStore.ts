@@ -37,6 +37,10 @@ interface PDFState {
   ocrResults: Map<number, OCRResult>;
   isProcessingOCR: boolean;
 
+  // Semantic (page embeddings from @huggingface/transformers MiniLM, 384-dim)
+  pageEmbeddings: Map<number, number[]>;
+  isIndexingEmbeddings: boolean;
+
   // UI state
   currentTool: string;
   isSidebarOpen: boolean;
@@ -72,7 +76,13 @@ interface PDFState {
   setCurrentSearchResultIndex: (index: number) => void;
 
   setOCRResult: (pageNumber: number, result: OCRResult) => void;
+  hydrateOCRResults: (results: OCRResult[]) => void;
   setIsProcessingOCR: (isProcessing: boolean) => void;
+
+  setPageEmbedding: (pageNumber: number, vector: number[]) => void;
+  hydratePageEmbeddings: (entries: Array<{ pageNumber: number; vector: number[] }>) => void;
+  clearPageEmbeddings: () => void;
+  setIsIndexingEmbeddings: (isIndexing: boolean) => void;
 
   setCurrentTool: (tool: string) => void;
   setIsSidebarOpen: (isOpen: boolean) => void;
@@ -101,6 +111,8 @@ const initialState = {
   currentSearchResultIndex: 0,
   ocrResults: new Map(),
   isProcessingOCR: false,
+  pageEmbeddings: new Map(),
+  isIndexingEmbeddings: false,
   currentTool: 'select',
   isSidebarOpen: true,
   sidebarTab: 'thumbnails' as const,
@@ -218,7 +230,29 @@ export const usePDFStore = create<PDFState>((set, get) => ({
     set({ ocrResults });
   },
 
+  hydrateOCRResults: (results) => {
+    const ocrResults = new Map<number, OCRResult>();
+    for (const r of results) ocrResults.set(r.pageNumber, r);
+    set({ ocrResults });
+  },
+
   setIsProcessingOCR: (isProcessing) => set({ isProcessingOCR: isProcessing }),
+
+  setPageEmbedding: (pageNumber, vector) => {
+    const pageEmbeddings = new Map(get().pageEmbeddings);
+    pageEmbeddings.set(pageNumber, vector);
+    set({ pageEmbeddings });
+  },
+
+  hydratePageEmbeddings: (entries) => {
+    const pageEmbeddings = new Map<number, number[]>();
+    for (const e of entries) pageEmbeddings.set(e.pageNumber, e.vector);
+    set({ pageEmbeddings });
+  },
+
+  clearPageEmbeddings: () => set({ pageEmbeddings: new Map() }),
+
+  setIsIndexingEmbeddings: (isIndexing) => set({ isIndexingEmbeddings: isIndexing }),
 
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),

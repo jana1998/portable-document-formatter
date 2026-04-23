@@ -95,20 +95,3 @@ vi.mock('pdfjs-dist', () => ({
   })),
 }));
 
-// Mock tesseract.js
-vi.mock('tesseract.js', () => ({
-  createWorker: vi.fn(() =>
-    Promise.resolve({
-      recognize: vi.fn(() =>
-        Promise.resolve({
-          data: {
-            text: 'OCR text',
-            confidence: 95,
-            words: [],
-          },
-        })
-      ),
-      terminate: vi.fn(() => Promise.resolve()),
-    })
-  ),
-}));

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Toolbar } from '@components/common/Toolbar';
 import { TooltipProvider } from '@components/ui/tooltip';
 
-// Mock the store
+// Mock the PDF store
 vi.mock('@renderer/store/usePDFStore', () => ({
   usePDFStore: () => ({
     currentDocument: {
@@ -19,11 +19,18 @@ vi.mock('@renderer/store/usePDFStore', () => ({
     scale: 1.0,
     isSidebarOpen: true,
     currentTool: 'select',
+    ocrResults: new Map(),
+    pageEmbeddings: new Map(),
+    isIndexingEmbeddings: false,
     setCurrentPage: vi.fn(),
     setScale: vi.fn(),
     setIsSidebarOpen: vi.fn(),
     setCurrentTool: vi.fn(),
   }),
+}));
+
+vi.mock('@renderer/store/useSettingsStore', () => ({
+  useSettingsStore: () => ({ backend: 'anthropic', setBackend: vi.fn() }),
 }));
 
 describe('Toolbar', () => {

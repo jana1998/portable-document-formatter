@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,143 +9,169 @@ import {
 } from '@components/ui/dialog';
 import { Button } from '@components/ui/button';
 import { usePDFStore } from '@renderer/store/usePDFStore';
-import { createWorker } from 'tesseract.js';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import { useToast } from '@renderer/hooks/use-toast';
+import type { OCRResult } from '@renderer/types';
 
 interface OCRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+// Pages below this threshold are treated as text-layer-sparse and sent to OCR.
+const TEXT_LAYER_MIN_CHARS = 200;
+
+// Target render DPI for OCR rasterization. PaddleOCR prefers 150–200 DPI.
+const OCR_RENDER_SCALE = 2.0;
+
 export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
-  const { currentDocument, currentPage, setOCRResult, setIsProcessingOCR, totalPages } = usePDFStore();
+  const { currentDocument, currentPage, setOCRResult, setIsProcessingOCR, totalPages } =
+    usePDFStore();
   const [ocrMode, setOcrMode] = useState<'current' | 'all'>('current');
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<string>('');
+  const [statusLine, setStatusLine] = useState('');
+  const [result, setResult] = useState('');
+  const [language] = useState<'multi'>('multi');
+  const abortRef = useRef(false);
   const { toast } = useToast();
+
+  const handleCancel = async () => {
+    abortRef.current = true;
+    try {
+      await window.electronAPI.cancelOCR();
+    } catch {
+      // noop
+    }
+  };
+
+  const rasterizePage = async (
+    renderer: PDFRenderer,
+    pageNumber: number
+  ): Promise<Blob | null> => {
+    const canvas = document.createElement('canvas');
+    await renderer.renderPage(pageNumber, canvas, OCR_RENDER_SCALE, 0);
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+  };
+
+  const synthesizeFromTextLayer = async (
+    renderer: PDFRenderer,
+    pageNumber: number
+  ): Promise<OCRResult | null> => {
+    try {
+      const textContent = await renderer.getTextContent(pageNumber);
+      const items = (textContent.items ?? []) as Array<{ str?: string }>;
+      const text = items
+        .map((i) => (typeof i.str === 'string' ? i.str : ''))
+        .filter(Boolean)
+        .join(' ');
+      if (text.replace(/\s+/g, ' ').trim().length < TEXT_LAYER_MIN_CHARS) return null;
+      return {
+        pageNumber,
+        text,
+        confidence: 1,
+        words: [],
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const recognizeOnePage = async (
+    renderer: PDFRenderer,
+    pageNumber: number
+  ): Promise<OCRResult | null> => {
+    const viaText = await synthesizeFromTextLayer(renderer, pageNumber);
+    if (viaText) return viaText;
+
+    const blob = await rasterizePage(renderer, pageNumber);
+    if (!blob) return null;
+    const buffer = await blob.arrayBuffer();
+    const res = await window.electronAPI.recognizePageImage(pageNumber, buffer);
+    return res as OCRResult;
+  };
 
   const handleOCR = async () => {
     if (!currentDocument) return;
 
+    abortRef.current = false;
     setIsProcessing(true);
     setIsProcessingOCR(true);
     setProgress(0);
     setResult('');
+    setStatusLine('Loading document…');
+
+    const renderer = new PDFRenderer();
 
     try {
-      const worker = await createWorker('eng', 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setProgress(Math.round(m.progress * 100));
-          }
-        },
-      });
-
-      if (ocrMode === 'current') {
-        // OCR current page only
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Failed to get canvas context');
-
-        // Get the PDF page as image
-        const data = await window.electronAPI.readFile(currentDocument.path);
-
-        // For simplicity, we'll get the current canvas from the viewer
-        const pdfCanvas = document.querySelector('.pdf-canvas') as HTMLCanvasElement;
-        if (pdfCanvas) {
-          canvas.width = pdfCanvas.width;
-          canvas.height = pdfCanvas.height;
-          ctx.drawImage(pdfCanvas, 0, 0);
-
-          const imageData = canvas.toDataURL();
-          const { data: { text, confidence, words } } = await worker.recognize(imageData);
-
-          setResult(text);
-          setOCRResult(currentPage, {
-            pageNumber: currentPage,
-            text,
-            confidence,
-            words: words.map((w: any) => ({
-              text: w.text,
-              confidence: w.confidence,
-              bbox: w.bbox,
-            })),
-          });
-        }
-      } else {
-        // OCR all pages
-        let allText = '';
-        const pageCount = currentDocument.pageCount || 1;
-
-        // Create a PDF renderer to render each page
-        const pdfRenderer = new PDFRenderer();
-        const data = await window.electronAPI.readFile(currentDocument.path);
-        const arrayBuffer = data instanceof ArrayBuffer
+      const data = await window.electronAPI.readFile(currentDocument.path);
+      const arrayBuffer =
+        data instanceof ArrayBuffer
           ? data
           : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-        await pdfRenderer.loadDocument(arrayBuffer);
+      await renderer.loadDocument(arrayBuffer);
 
-        for (let page = 1; page <= pageCount; page++) {
-          setResult(`Processing page ${page} of ${pageCount}...\n\n${allText}`);
-          setProgress(Math.round(((page - 1) / pageCount) * 100));
+      const pages = ocrMode === 'current' ? [currentPage] : range(1, currentDocument.pageCount || totalPages || 1);
+      const results: OCRResult[] = [];
+      let accumulated = '';
 
-          try {
-            // Create an off-screen canvas for each page
-            const canvas = document.createElement('canvas');
-            await pdfRenderer.renderPage(page, canvas, 1.0, 0);
+      for (let i = 0; i < pages.length; i++) {
+        if (abortRef.current) break;
+        const pageNumber = pages[i];
+        setStatusLine(`Processing page ${pageNumber}…`);
+        setProgress(Math.round((i / pages.length) * 100));
 
-            const imageData = canvas.toDataURL();
-            const { data: { text, confidence } } = await worker.recognize(imageData);
-
-            allText += `\n--- Page ${page} ---\n${text}\n`;
-
-            // Store result for each page
-            setOCRResult(page, {
-              pageNumber: page,
-              text,
-              confidence,
-              words: [],
-            });
-          } catch (error) {
-            console.error(`Failed to OCR page ${page}:`, error);
-            allText += `\n--- Page ${page} ---\n[Error processing page]\n`;
-          }
+        const pageResult = await recognizeOnePage(renderer, pageNumber);
+        if (!pageResult) {
+          accumulated += `\n--- Page ${pageNumber} ---\n[no text]\n`;
+          continue;
         }
 
-        setProgress(100);
-        setResult(allText);
-        await pdfRenderer.destroy();
+        setOCRResult(pageNumber, pageResult);
+        results.push(pageResult);
+        accumulated += `\n--- Page ${pageNumber} ---\n${pageResult.text}\n`;
+        setResult(accumulated);
       }
 
-      await worker.terminate();
-      toast({
-        title: "OCR Completed Successfully",
-        description: "Text has been extracted from the PDF.",
-        variant: "success",
-      });
+      if (!abortRef.current) {
+        setProgress(100);
+        setStatusLine('Saving sidecar…');
+        try {
+          await window.electronAPI.saveOCRSidecar(currentDocument.path, results);
+        } catch (sidecarErr) {
+          console.warn('OCR sidecar write failed:', sidecarErr);
+        }
+        toast({
+          title: 'OCR complete',
+          description: `Extracted text from ${results.length} page${results.length === 1 ? '' : 's'}.`,
+          variant: 'success',
+        });
+      } else {
+        toast({ title: 'OCR cancelled', variant: 'default' });
+      }
     } catch (error) {
       console.error('OCR failed:', error);
       toast({
-        title: "OCR Failed",
-        description: String(error),
-        variant: "destructive",
+        title: 'OCR Failed',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
       });
     } finally {
+      await renderer.destroy().catch(() => undefined);
       setIsProcessing(false);
       setIsProcessingOCR(false);
-      setProgress(0);
+      setStatusLine('');
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>OCR - Extract Text from PDF</DialogTitle>
+          <DialogTitle>OCR — Extract Text from PDF</DialogTitle>
           <DialogDescription>
-            Use Optical Character Recognition to extract text from scanned PDFs or images
+            Run PaddleOCR locally on-device. Born-digital pages use the embedded text layer
+            automatically; scanned pages are recognized in a background process.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,16 +205,31 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
                   disabled={isProcessing}
                 />
                 <label htmlFor="ocr-all" className="text-sm cursor-pointer">
-                  All pages (slower, processes sequentially)
+                  All pages (text-layer pages are skipped automatically)
                 </label>
               </div>
             </div>
           </div>
 
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Language</label>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              value={language}
+              disabled
+              aria-label="OCR language"
+            >
+              <option value="multi">Chinese + English (multilingual, default)</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Additional languages can be added in a later build.
+            </p>
+          </div>
+
           {isProcessing && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Processing...</span>
+                <span>{statusLine || 'Processing…'}</span>
                 <span>{progress}%</span>
               </div>
               <div className="w-full bg-secondary rounded-full h-2">
@@ -214,8 +255,8 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
                 onClick={() => {
                   navigator.clipboard.writeText(result);
                   toast({
-                    title: "Copied to Clipboard",
-                    description: "Extracted text has been copied.",
+                    title: 'Copied to Clipboard',
+                    description: 'Extracted text has been copied.',
                   });
                 }}
               >
@@ -225,26 +266,38 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
           )}
 
           <div className="rounded-md bg-muted p-3 text-sm">
-            <p className="font-medium mb-1">How OCR Works:</p>
+            <p className="font-medium mb-1">How it works</p>
             <ul className="text-xs space-y-1 text-muted-foreground">
-              <li>• Analyzes the visual content of the PDF page</li>
-              <li>• Recognizes text characters using AI</li>
-              <li>• Extracts text that can be searched and copied</li>
-              <li>• Works best with clear, high-resolution scans</li>
-              <li>• Processing time: ~5-10 seconds per page</li>
+              <li>• Tries the PDF's text layer first — instant and perfect on born-digital PDFs.</li>
+              <li>• Falls back to PaddleOCR v4 (ONNX) in a sandboxed background process.</li>
+              <li>• Runs 100% on-device; no content leaves your machine.</li>
             </ul>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-            {result ? 'Close' : 'Cancel'}
-          </Button>
-          <Button onClick={handleOCR} disabled={isProcessing || !currentDocument}>
-            {isProcessing ? 'Processing...' : 'Start OCR'}
-          </Button>
+          {isProcessing ? (
+            <Button variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                {result ? 'Close' : 'Cancel'}
+              </Button>
+              <Button onClick={handleOCR} disabled={!currentDocument}>
+                Start OCR
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function range(start: number, end: number): number[] {
+  const out: number[] = [];
+  for (let i = start; i <= end; i++) out.push(i);
+  return out;
 }
