@@ -147,6 +147,10 @@ function setupIPCHandlers() {
     return pdfService.extractText(filePath);
   });
 
+  ipcMain.handle('pdf:getPageStructuredText', async (_, filePath: string, pageNumber: number) => {
+    return pdfService.getPageStructuredText(filePath, pageNumber);
+  });
+
   // Annotations operations
   ipcMain.handle('annotations:save', async (_, filePath: string, annotations: any) => {
     const annotationsPath = filePath.replace('.pdf', '.annotations.json');
@@ -166,16 +170,7 @@ function setupIPCHandlers() {
 
   ipcMain.handle('pdf:applyModifications', async (_, filePath: string, modifications: any, outputPath: string) => {
     try {
-      console.log('Applying modifications to PDF:', filePath);
-      console.log('Output path:', outputPath);
-      console.log('Modifications:', {
-        textElements: modifications.textElements?.length || 0,
-        imageElements: modifications.imageElements?.length || 0,
-        annotations: modifications.annotations?.length || 0,
-      });
-
       await pdfService.applyModificationsToPDF(filePath, modifications, outputPath);
-      console.log('PDF modifications applied successfully');
       return true;
     } catch (error) {
       console.error('Apply modifications error:', error);

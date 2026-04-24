@@ -119,6 +119,35 @@ export interface OCRWord {
   };
 }
 
+export interface TextEdit {
+  id: string;
+  pageNumber: number;
+  originalText: string;
+  newText: string;
+  // Bounding box in mupdf coordinate space (Y=0 at top, 72dpi units)
+  mupdfX: number;
+  mupdfY: number;
+  mupdfW: number;
+  mupdfH: number;
+  fontSize: number;
+  fontName: string;
+  fontFamily: string;
+  fontWeight: string;
+  fontStyle: string;
+}
+
+export type TextEditLineInfo = {
+  text: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  font: {
+    name: string;
+    family: string;
+    weight: string;
+    style: string;
+    size: number;
+  };
+};
+
 export interface ExportOptions {
   format: 'pdf' | 'png' | 'jpeg' | 'txt';
   pages?: number[];

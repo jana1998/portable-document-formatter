@@ -41,6 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
+    "mupdf": "^1.27.0",
     "onnxruntime-node": "^1.24.3",
     "openai": "^6.34.0",
     "pdf-lib": "^1.17.1",
@@ -102,6 +103,7 @@
       "node_modules/@gutenye/**",
       "node_modules/sharp/**",
       "node_modules/@img/**",
+      "node_modules/mupdf/**",
       "resources/**"
     ],
     "extraResources": [

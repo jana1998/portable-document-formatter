@@ -6,6 +6,7 @@ import type {
   ImageElement,
   SearchResult,
   OCRResult,
+  TextEdit,
 } from '@renderer/types';
 
 interface PDFState {
@@ -27,6 +28,10 @@ interface PDFState {
   // Image elements
   imageElements: Map<number, ImageElement[]>;
   selectedImageElementId: string | null;
+
+  // Text edits (Foxit-style in-place editing)
+  textEdits: Map<number, TextEdit[]>;
+  selectedTextEditId: string | null;
 
   // Search
   searchQuery: string;
@@ -71,6 +76,11 @@ interface PDFState {
   deleteImageElement: (id: string) => void;
   setSelectedImageElementId: (id: string | null) => void;
 
+  addTextEdit: (edit: TextEdit) => void;
+  updateTextEdit: (id: string, data: Partial<TextEdit>) => void;
+  deleteTextEdit: (id: string) => void;
+  setSelectedTextEditId: (id: string | null) => void;
+
   setSearchQuery: (query: string) => void;
   setSearchResults: (results: SearchResult[]) => void;
   setCurrentSearchResultIndex: (index: number) => void;
@@ -106,6 +116,8 @@ const initialState = {
   selectedTextElementId: null,
   imageElements: new Map(),
   selectedImageElementId: null,
+  textEdits: new Map(),
+  selectedTextEditId: null,
   searchQuery: '',
   searchResults: [],
   currentSearchResultIndex: 0,
@@ -219,6 +231,42 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   },
 
   setSelectedImageElementId: (id) => set({ selectedImageElementId: id }),
+
+  addTextEdit: (edit) => {
+    const textEdits = new Map(get().textEdits);
+    const pageEdits = textEdits.get(edit.pageNumber) || [];
+    // Replace existing edit for same position if any, otherwise append
+    const existingIdx = pageEdits.findIndex((e) => e.id === edit.id);
+    if (existingIdx !== -1) {
+      pageEdits[existingIdx] = edit;
+      textEdits.set(edit.pageNumber, [...pageEdits]);
+    } else {
+      textEdits.set(edit.pageNumber, [...pageEdits, edit]);
+    }
+    set({ textEdits });
+  },
+
+  updateTextEdit: (id, data) => {
+    const textEdits = new Map(get().textEdits);
+    textEdits.forEach((pageEdits, pageNumber) => {
+      const index = pageEdits.findIndex((e) => e.id === id);
+      if (index !== -1) {
+        pageEdits[index] = { ...pageEdits[index], ...data };
+        textEdits.set(pageNumber, [...pageEdits]);
+      }
+    });
+    set({ textEdits });
+  },
+
+  deleteTextEdit: (id) => {
+    const textEdits = new Map(get().textEdits);
+    textEdits.forEach((pageEdits, pageNumber) => {
+      textEdits.set(pageNumber, pageEdits.filter((e) => e.id !== id));
+    });
+    set({ textEdits });
+  },
+
+  setSelectedTextEditId: (id) => set({ selectedTextEditId: id }),
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchResults: (results) => set({ searchResults: results }),

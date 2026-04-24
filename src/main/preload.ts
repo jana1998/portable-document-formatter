@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportToImage: (filePath: string, pageNumber: number, format: string, dpi: number) => ipcRenderer.invoke('pdf:exportToImage', filePath, pageNumber, format, dpi),
   extractText: (filePath: string) => ipcRenderer.invoke('pdf:extractText', filePath),
 
+  getPageStructuredText: (filePath: string, pageNumber: number) =>
+    ipcRenderer.invoke('pdf:getPageStructuredText', filePath, pageNumber),
+
   // Annotations
   saveAnnotations: (filePath: string, annotations: any) => ipcRenderer.invoke('annotations:save', filePath, annotations),
   loadAnnotations: (filePath: string) => ipcRenderer.invoke('annotations:load', filePath),
@@ -93,6 +96,11 @@ declare global {
       addImageToPDF: (filePath: string, pageNumber: number, imageData: string, x: number, y: number, width: number, height: number, outputPath: string) => Promise<void>;
       exportToImage: (filePath: string, pageNumber: number, format: string, dpi: number) => Promise<string>;
       extractText: (filePath: string) => Promise<string>;
+      getPageStructuredText: (filePath: string, pageNumber: number) => Promise<{
+        text: string;
+        bbox: { x: number; y: number; w: number; h: number };
+        font: { name: string; family: string; weight: string; style: string; size: number };
+      }[]>;
       saveAnnotations: (filePath: string, annotations: any) => Promise<string>;
       loadAnnotations: (filePath: string) => Promise<any>;
       applyModifications: (filePath: string, modifications: any, outputPath: string) => Promise<boolean>;
