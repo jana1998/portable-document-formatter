@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Search, SearchX, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw, Search, SearchX, Sparkles } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { EmptyState } from '@components/ui/empty-state';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
-import { rankPagesBySimilarity } from '@renderer/services/embeddings-indexer';
+import {
+  rankPagesBySimilarity,
+  rebuildEmbeddingsForDocument,
+} from '@renderer/services/embeddings-indexer';
 import { cn } from '@renderer/lib/utils';
 import type { OCRResult, SearchResult } from '@renderer/types';
 
@@ -184,12 +187,24 @@ export function SearchPanel() {
             <Sparkles className="h-3.5 w-3.5" />
             Semantic
           </button>
-          {isIndexingEmbeddings && (
-            <span className="ml-auto flex items-center gap-1 pr-2 text-[11px] text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Indexing…
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-2 pr-1">
+            {isIndexingEmbeddings ? (
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Indexing…
+              </span>
+            ) : currentDocument ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => rebuildEmbeddingsForDocument(currentDocument.path)}
+                title="Re-index this document for semantic search"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Re-index
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 rounded-[1.1rem] border border-input bg-background/80 px-3">
@@ -267,7 +282,7 @@ export function SearchPanel() {
               className={cn(
                 'panel-muted block w-full p-4 text-left',
                 index === currentSearchResultIndex &&
-                  'border-primary/60 bg-primary/5 shadow-[0_14px_32px_rgba(13,148,136,0.12)]'
+                  'border-foreground/40 bg-muted shadow-soft-1'
               )}
               onClick={() => {
                 setCurrentSearchResultIndex(index);

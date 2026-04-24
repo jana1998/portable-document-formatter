@@ -222,7 +222,7 @@ export function ThumbnailsPanel() {
                 onDrop={(e) => handleDrop(e, pageNumber)}
                 className={cn(
                   'group panel-muted block w-full overflow-hidden p-2 text-left transition-all relative',
-                  currentPage === pageNumber && 'border-primary/60 bg-primary/5 shadow-[0_14px_32px_rgba(13,148,136,0.12)]',
+                  currentPage === pageNumber && 'border-foreground bg-muted shadow-soft-1',
                   isDragging && 'opacity-50 scale-95',
                   isDropTarget && 'ring-2 ring-primary ring-offset-2',
                   !isReordering && 'cursor-move'

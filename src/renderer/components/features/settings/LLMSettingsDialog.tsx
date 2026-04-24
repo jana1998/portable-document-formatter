@@ -91,20 +91,21 @@ export function LLMSettingsDialog({ open, onOpenChange }: LLMSettingsDialogProps
                   key={b}
                   type="button"
                   onClick={() => setBackend(b)}
-                  className={`rounded-md border px-3 py-2 transition ${
+                  className={`rounded-button border px-3 py-2 transition ${
                     backend === b
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-input text-muted-foreground hover:text-foreground'
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {b === 'local' ? 'Local (v1.1)' : b === 'anthropic' ? 'Claude' : 'OpenAI'}
+                  {b === 'local' ? 'On-device' : b === 'anthropic' ? 'Claude' : 'OpenAI'}
                 </button>
               ))}
             </div>
             {backend === 'local' && (
               <p className="text-xs text-muted-foreground">
-                Local Qwen 2.5 1.5B (~1GB, node-llama-cpp) lands in v1.1. For now, choose Claude or
-                OpenAI above.
+                Runs <span className="font-medium text-foreground">SmolLM2-360M-Instruct</span>{' '}
+                locally via ONNX. First use downloads ~360MB to your user-data folder; no API key
+                or network after that.
               </p>
             )}
           </div>

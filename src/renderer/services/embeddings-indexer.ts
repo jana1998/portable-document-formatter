@@ -40,23 +40,8 @@ async function gatherPageTexts(
   return out;
 }
 
-export async function ensureEmbeddingsForDocument(pdfPath: string): Promise<void> {
+async function buildEmbeddings(pdfPath: string): Promise<void> {
   const store = usePDFStore.getState();
-  const doc = store.currentDocument;
-  if (!doc || doc.path !== pdfPath) return;
-
-  // Fast path: sidecar present → hydrate and bail.
-  try {
-    const sidecar = await window.electronAPI.loadEmbeddingsSidecar(pdfPath);
-    if (sidecar && sidecar.length > 0) {
-      store.hydratePageEmbeddings(sidecar);
-      return;
-    }
-  } catch (err) {
-    console.warn('embeddings sidecar load failed:', err);
-  }
-
-  // Background build. Non-blocking; UI flag in `isIndexingEmbeddings`.
   store.setIsIndexingEmbeddings(true);
   const renderer = new PDFRenderer();
 
@@ -70,7 +55,10 @@ export async function ensureEmbeddingsForDocument(pdfPath: string): Promise<void
 
     const total = renderer.getPageCount();
     const pages = await gatherPageTexts(renderer, total, usePDFStore.getState().ocrResults);
-    if (pages.length === 0) return;
+    if (pages.length === 0) {
+      console.info('[embeddings] no text to index yet (run OCR for scans)');
+      return;
+    }
 
     const embeddings = await window.electronAPI.embedDocument(pdfPath, pages);
     if (!embeddings || embeddings.length === 0) return;
@@ -87,6 +75,33 @@ export async function ensureEmbeddingsForDocument(pdfPath: string): Promise<void
     store.setIsIndexingEmbeddings(false);
     await renderer.destroy().catch(() => undefined);
   }
+}
+
+export async function ensureEmbeddingsForDocument(pdfPath: string): Promise<void> {
+  const store = usePDFStore.getState();
+  const doc = store.currentDocument;
+  if (!doc || doc.path !== pdfPath) return;
+
+  // Fast path: sidecar present → hydrate and bail.
+  try {
+    const sidecar = await window.electronAPI.loadEmbeddingsSidecar(pdfPath);
+    if (sidecar && sidecar.length > 0) {
+      store.hydratePageEmbeddings(sidecar);
+      return;
+    }
+  } catch (err) {
+    console.warn('embeddings sidecar load failed:', err);
+  }
+
+  await buildEmbeddings(pdfPath);
+}
+
+// Force re-index (used after OCR finishes or when user clicks "Re-index").
+export async function rebuildEmbeddingsForDocument(pdfPath: string): Promise<void> {
+  const store = usePDFStore.getState();
+  if (!store.currentDocument || store.currentDocument.path !== pdfPath) return;
+  store.clearPageEmbeddings();
+  await buildEmbeddings(pdfPath);
 }
 
 function cosine(a: number[], b: number[]): number {

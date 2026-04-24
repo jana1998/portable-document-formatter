@@ -11,6 +11,7 @@ import { Button } from '@components/ui/button';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import { useToast } from '@renderer/hooks/use-toast';
+import { rebuildEmbeddingsForDocument } from '@renderer/services/embeddings-indexer';
 import type { OCRResult } from '@renderer/types';
 
 interface OCRDialogProps {
@@ -141,6 +142,14 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
         } catch (sidecarErr) {
           console.warn('OCR sidecar write failed:', sidecarErr);
         }
+
+        // Now that we have OCR text, rebuild the embeddings index so Chat +
+        // Semantic search immediately become usable on this document.
+        if (results.length > 0) {
+          setStatusLine('Indexing for AI search…');
+          void rebuildEmbeddingsForDocument(currentDocument.path);
+        }
+
         toast({
           title: 'OCR complete',
           description: `Extracted text from ${results.length} page${results.length === 1 ? '' : 's'}.`,

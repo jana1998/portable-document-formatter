@@ -268,6 +268,7 @@ app.on('before-quit', () => {
   ocrService.shutdown().catch(() => undefined);
   embeddingsService.shutdown().catch(() => undefined);
   llmService.cancelCurrent();
+  llmService.shutdown().catch(() => undefined);
 });
 
 // TypeScript: LLMBackend is re-exported only for convenience elsewhere.

@@ -15,8 +15,6 @@ import {
   MessageSquare,
   Minus,
   Moon,
-  PanelLeft,
-  PanelLeftClose,
   Pencil,
   Pointer,
   RotateCw,
@@ -65,7 +63,6 @@ export function Toolbar() {
     totalPages,
     scale,
     rotation,
-    isSidebarOpen,
     isDarkMode,
     setCurrentPage,
     setScale,
@@ -124,41 +121,23 @@ export function Toolbar() {
   return (
     <>
       <header className="toolbar-shell">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+          {/* Brand + document info */}
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_24px_rgba(13,148,136,0.28)]">
-              <FileText className="h-5 w-5" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+              <FileText className="h-[18px] w-[18px]" />
             </div>
 
-            {currentDocument ? (
-              <ToolbarButton label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}>
-                <Button
-                  variant="toolbar"
-                  size="icon"
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  aria-label="Toggle sidebar"
-                >
-                  {isSidebarOpen ? (
-                    <PanelLeftClose className="h-4 w-4" />
-                  ) : (
-                    <PanelLeft className="h-4 w-4" />
-                  )}
-                </Button>
-              </ToolbarButton>
-            ) : null}
-
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                Portable Document Formatter
-              </p>
-              <p className="truncate text-sm font-semibold text-foreground">
+            <div className="min-w-0 border-l border-border/60 pl-3 leading-tight">
+              <p className="truncate text-[13px] font-medium text-foreground">
                 {currentDocument?.name ?? 'Production PDF workspace'}
               </p>
-              <p className="truncate text-xs text-muted-foreground">{documentDetails}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{documentDetails}</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Primary CTA + utility group */}
+          <div className="flex items-center gap-2">
             <Button
               size="toolbar"
               onClick={handleOpenFile}
@@ -169,36 +148,38 @@ export function Toolbar() {
               <span>Open PDF</span>
             </Button>
 
-            {currentDocument ? (
-              <ToolbarButton label="Save PDF">
+            <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-background/60 p-1">
+              {currentDocument ? (
+                <ToolbarButton label="Save PDF">
+                  <Button
+                    variant="toolbar"
+                    size="icon"
+                    onClick={() => setSaveDialogOpen(true)}
+                    aria-label="Save PDF"
+                  >
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </ToolbarButton>
+              ) : null}
+
+              <ToolbarButton label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
                 <Button
-                  variant="soft"
+                  variant="toolbar"
                   size="icon"
-                  onClick={() => setSaveDialogOpen(true)}
-                  aria-label="Save PDF"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  aria-label="Toggle dark mode"
                 >
-                  <Save className="h-4 w-4" />
+                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               </ToolbarButton>
-            ) : null}
-
-            <ToolbarButton label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
-              <Button
-                variant={isDarkMode ? 'soft' : 'toolbar'}
-                size="icon"
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                aria-label="Toggle dark mode"
-              >
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-            </ToolbarButton>
+            </div>
           </div>
         </div>
 
         {currentDocument ? (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-background/60 p-1">
                 <ToolbarButton label="Previous page">
                   <Button
                     variant="toolbar"
@@ -228,7 +209,7 @@ export function Toolbar() {
                 </ToolbarButton>
               </div>
 
-              <div className="flex items-center gap-2 rounded-[1.2rem] border border-border/70 bg-background/70 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1.5">
                 <ToolbarButton label="Zoom out">
                   <Button
                     variant="toolbar"
@@ -269,7 +250,7 @@ export function Toolbar() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-background/60 p-1">
                 {toolOptions.map(({ id, label, icon: Icon }) => (
                   <ToolbarButton key={id} label={label}>
                     <Button
@@ -277,7 +258,7 @@ export function Toolbar() {
                       size="icon"
                       onClick={() => setCurrentTool(id)}
                       className={cn(
-                        currentTool === id && 'shadow-[0_10px_24px_rgba(13,148,136,0.2)]'
+                        currentTool === id && 'rounded-full'
                       )}
                       aria-label={label}
                     >
@@ -287,7 +268,7 @@ export function Toolbar() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-background/60 p-1">
                 {annotationTools.map(({ id, label, icon: Icon }) => (
                   <ToolbarButton key={id} label={label}>
                     <Button
@@ -295,7 +276,7 @@ export function Toolbar() {
                       size="icon"
                       onClick={() => setCurrentTool(id)}
                       className={cn(
-                        currentTool === id && 'shadow-[0_10px_24px_rgba(13,148,136,0.2)]'
+                        currentTool === id && 'rounded-full'
                       )}
                       aria-label={label}
                     >
@@ -305,7 +286,7 @@ export function Toolbar() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-1 rounded-[1.2rem] border border-border/70 bg-background/70 p-1.5">
+              <div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-background/60 p-1">
                 <ToolbarButton label="Search document">
                   <Button
                     variant="toolbar"

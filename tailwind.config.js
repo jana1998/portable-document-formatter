@@ -50,8 +50,26 @@ module.exports = {
       },
       borderRadius: {
         lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 4px)',
+        sm: 'calc(var(--radius) - 8px)',
+        button: '1.25rem',
+        stadium: '2.5rem',
+        pill: '999px',
+      },
+      fontFamily: {
+        sans: ['"Sofia Sans"', '"Inter"', 'system-ui', 'sans-serif'],
+      },
+      fontWeight: {
+        body: '450',
+      },
+      letterSpacing: {
+        tightest: '-0.02em',
+        'tighter-1': '-0.01em',
+      },
+      boxShadow: {
+        'soft-1': '0 4px 24px rgba(20, 20, 19, 0.04)',
+        'soft-2': '0 24px 48px rgba(20, 20, 19, 0.08)',
+        'soft-3': '0 70px 110px rgba(20, 20, 19, 0.25)',
       },
       keyframes: {
         'accordion-down': {

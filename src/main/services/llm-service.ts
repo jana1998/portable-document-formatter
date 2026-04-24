@@ -1,6 +1,10 @@
 // Main-process LLM service.
-// Hybrid backend dispatcher: local (node-llama-cpp, scaffold only for v1) +
-// cloud (Anthropic, OpenAI). Streams tokens to the renderer via
+// Hybrid backend dispatcher:
+//   - local     → @huggingface/transformers + SmolLM2-360M-Instruct (Q4 ONNX)
+//                 runs in src/main/workers/llm-local-worker.ts utilityProcess.
+//   - anthropic → @anthropic-ai/sdk streaming
+//   - openai    → openai responses.stream
+// All three stream tokens to the renderer via
 // webContents.send('llm:chunk', { requestId, chunk }).
 //
 // API keys live in OS keychain via Electron's built-in safeStorage; the
@@ -10,7 +14,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import { app, safeStorage, type WebContents } from 'electron';
+import { app, safeStorage, utilityProcess, type UtilityProcess, type WebContents } from 'electron';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 
@@ -39,7 +43,9 @@ interface StoredSecrets {
 const DEFAULT_MODELS: Record<LLMBackend, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4.1-mini',
-  local: 'qwen-2.5-1.5b-instruct-q4_k_m',
+  // Small Q4 ONNX instruct model that runs reasonably on CPU.
+  // ~360MB, auto-downloaded to userData/models/llm on first use.
+  local: 'HuggingFaceTB/SmolLM2-360M-Instruct',
 };
 
 function secretsPath(): string {
@@ -82,8 +88,141 @@ async function writeSecrets(raw: StoredSecrets): Promise<void> {
   await fs.writeFile(secretsPath(), JSON.stringify(payload, null, 2), { mode: 0o600 });
 }
 
+// Local worker: reused across generations, lazy-initialized on first use.
+type LocalMsg =
+  | { type: 'ready'; id: string }
+  | { type: 'chunk'; id: string; text: string }
+  | { type: 'done'; id: string }
+  | { type: 'cancelled'; id: string }
+  | { type: 'error'; id: string; message: string };
+
+interface LocalStream {
+  onChunk: (text: string) => void;
+  onDone: () => void;
+  onError: (msg: string) => void;
+}
+
+class LocalLLM {
+  private proc: UtilityProcess | null = null;
+  private ready: Promise<void> | null = null;
+  private listeners = new Map<string, LocalStream>();
+  private readonly workerPath = path.join(
+    __dirname,
+    '..',
+    'workers',
+    'llm-local-worker.js'
+  );
+
+  private cacheDir(): string {
+    return path.join(app.getPath('userData'), 'models', 'llm');
+  }
+
+  private async ensureWorker(modelId?: string): Promise<void> {
+    if (this.ready) return this.ready;
+
+    this.ready = new Promise<void>((resolveReady, rejectReady) => {
+      try {
+        this.proc = utilityProcess.fork(this.workerPath, [], { stdio: 'pipe' });
+      } catch (err) {
+        rejectReady(err as Error);
+        return;
+      }
+
+      this.proc.on('message', (raw: unknown) => {
+        const msg = raw as LocalMsg;
+        if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
+
+        if (msg.type === 'ready') {
+          if (msg.id === '__init__') resolveReady();
+          return;
+        }
+
+        const listener = this.listeners.get(msg.id);
+        if (!listener) return;
+
+        if (msg.type === 'chunk') listener.onChunk(msg.text);
+        else if (msg.type === 'done' || msg.type === 'cancelled') {
+          listener.onDone();
+          this.listeners.delete(msg.id);
+        } else if (msg.type === 'error') {
+          listener.onError(msg.message);
+          this.listeners.delete(msg.id);
+        }
+      });
+
+      this.proc.on('exit', (code) => {
+        for (const l of this.listeners.values())
+          l.onError(`llm-local-worker exited (code ${code})`);
+        this.listeners.clear();
+        this.proc = null;
+        this.ready = null;
+      });
+
+      this.proc.stdout?.on('data', (buf: Buffer) =>
+        process.stdout.write(`[llm-local-worker] ${buf}`)
+      );
+      this.proc.stderr?.on('data', (buf: Buffer) =>
+        process.stderr.write(`[llm-local-worker] ${buf}`)
+      );
+
+      this.proc.postMessage({
+        type: 'init',
+        id: '__init__',
+        cacheDir: this.cacheDir(),
+        modelId,
+      });
+    });
+
+    return this.ready;
+  }
+
+  async generate(
+    id: string,
+    prompt: string,
+    opts: { system?: string; maxTokens?: number; temperature?: number; model?: string },
+    stream: LocalStream
+  ): Promise<void> {
+    await this.ensureWorker(opts.model);
+    this.listeners.set(id, stream);
+    this.proc!.postMessage({
+      type: 'generate',
+      id,
+      prompt,
+      system: opts.system,
+      maxNewTokens: opts.maxTokens,
+      temperature: opts.temperature,
+      cacheDir: this.cacheDir(),
+      modelId: opts.model,
+    });
+  }
+
+  cancel(id: string): void {
+    if (!this.proc) return;
+    this.proc.postMessage({ type: 'cancel', id });
+  }
+
+  async shutdown(): Promise<void> {
+    if (!this.proc) return;
+    try {
+      this.proc.kill();
+    } catch {
+      // ignore
+    }
+    this.proc = null;
+    this.ready = null;
+    for (const l of this.listeners.values()) l.onError('llm service shutdown');
+    this.listeners.clear();
+  }
+}
+
 export class LLMService {
   private currentRequestAbort: AbortController | null = null;
+  private currentLocalId: string | null = null;
+  private readonly local = new LocalLLM();
+
+  async shutdown(): Promise<void> {
+    await this.local.shutdown();
+  }
 
   async hasApiKey(backend: 'anthropic' | 'openai'): Promise<boolean> {
     const secrets = await readSecrets();
@@ -138,6 +277,10 @@ export class LLMService {
   cancelCurrent(): void {
     this.currentRequestAbort?.abort();
     this.currentRequestAbort = null;
+    if (this.currentLocalId) {
+      this.local.cancel(this.currentLocalId);
+      this.currentLocalId = null;
+    }
   }
 
   async generate(
@@ -177,14 +320,47 @@ export class LLMService {
     const { backend, model, system, temperature, maxTokens } = options;
 
     if (backend === 'local') {
-      // Local LLM (node-llama-cpp) is scaffolded for v1.1. For now the hybrid
-      // service dispatches to a clear 'not-ready' error so the Chat UI can
-      // prompt the user to switch to a cloud backend or wait for the local
-      // build.
-      webContents.send('llm:error', {
-        requestId,
-        message:
-          'Local LLM (Qwen 2.5 1.5B) is downloading in v1.1. Set a Claude or OpenAI key in Settings for now.',
+      // On-device inference via @huggingface/transformers in a utilityProcess.
+      // First generation triggers a ~360MB model download to userData/models/llm.
+      this.currentLocalId = requestId;
+      await new Promise<void>((resolve) => {
+        this.local
+          .generate(
+            requestId,
+            prompt,
+            {
+              system,
+              maxTokens: maxTokens ?? 512,
+              temperature,
+              model,
+            },
+            {
+              onChunk: (text) => {
+                if (signal.aborted) return;
+                webContents.send('llm:chunk', { requestId, chunk: text });
+              },
+              onDone: () => {
+                webContents.send('llm:done', { requestId });
+                if (this.currentLocalId === requestId) this.currentLocalId = null;
+                resolve();
+              },
+              onError: (message) => {
+                webContents.send('llm:error', { requestId, message });
+                if (this.currentLocalId === requestId) this.currentLocalId = null;
+                resolve();
+              },
+            }
+          )
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            webContents.send('llm:error', { requestId, message });
+            if (this.currentLocalId === requestId) this.currentLocalId = null;
+            resolve();
+          });
+
+        signal.addEventListener('abort', () => {
+          this.local.cancel(requestId);
+        });
       });
       return;
     }

@@ -1,53 +1,81 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700&family=Inter:wght@400;450;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Mastercard-inspired design system.
+ * Canvas Cream surfaces, Ink Black type + CTAs, oversized pill radii,
+ * Signal Orange reserved for focus/accent, soft atmospheric shadows.
+ * See DESIGN.md for the full spec.
+ */
+
 @layer base {
   :root {
-    --background: 174 55% 97%;
-    --foreground: 179 48% 16%;
-    --card: 0 0% 100%;
-    --card-foreground: 179 48% 16%;
+    /* Canvas Cream (#F3F0EE) */
+    --background: 30 13% 94%;
+    /* Ink Black (#141413) */
+    --foreground: 60 3% 8%;
+
+    /* Lifted Cream (#FCFBFA) */
+    --card: 40 20% 98%;
+    --card-foreground: 60 3% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 179 48% 16%;
-    --primary: 175 84% 32%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 173 33% 93%;
-    --secondary-foreground: 179 48% 18%;
-    --muted: 173 37% 95%;
-    --muted-foreground: 181 16% 38%;
-    --accent: 24 95% 56%;
-    --accent-foreground: 24 93% 15%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 174 25% 84%;
-    --input: 173 29% 88%;
-    --ring: 175 84% 32%;
-    --radius: 1rem;
+    --popover-foreground: 60 3% 8%;
+
+    /* Primary = Ink Black pill on cream */
+    --primary: 60 3% 8%;
+    --primary-foreground: 30 13% 94%;
+
+    --secondary: 40 20% 98%;
+    --secondary-foreground: 60 3% 8%;
+    --muted: 32 12% 90%;
+    --muted-foreground: 0 0% 41%;
+
+    /* Signal Orange (#CF4500) — reserved for focus, accents, consent */
+    --accent: 19 100% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 74% 42%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 10% 85%;
+    --input: 30 10% 82%;
+    --ring: 19 100% 40%;
+
+    /* Default radius = 20px (primary CTA pill). Cards use `.rounded-stadium` (40px). */
+    --radius: 1.25rem;
   }
 
   .dark {
-    --background: 189 36% 10%;
-    --foreground: 210 40% 98%;
-    --card: 188 34% 14%;
-    --card-foreground: 210 40% 98%;
-    --popover: 188 34% 14%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 173 66% 46%;
-    --primary-foreground: 180 100% 8%;
-    --secondary: 188 24% 19%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 188 22% 17%;
-    --muted-foreground: 181 13% 70%;
-    --accent: 24 95% 56%;
-    --accent-foreground: 24 93% 12%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 188 19% 25%;
-    --input: 188 19% 25%;
-    --ring: 173 66% 46%;
+    /* Warm ink black canvas */
+    --background: 60 3% 8%;
+    --foreground: 30 13% 94%;
+
+    --card: 60 3% 12%;
+    --card-foreground: 30 13% 94%;
+    --popover: 60 3% 14%;
+    --popover-foreground: 30 13% 94%;
+
+    /* Primary inverts to cream on dark */
+    --primary: 30 13% 94%;
+    --primary-foreground: 60 3% 8%;
+
+    --secondary: 60 3% 15%;
+    --secondary-foreground: 30 13% 94%;
+    --muted: 60 3% 14%;
+    --muted-foreground: 30 8% 66%;
+
+    --accent: 19 95% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 60 3% 19%;
+    --input: 60 3% 22%;
+    --ring: 19 95% 50%;
   }
 }
 
@@ -64,236 +92,167 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background-image:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 28%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 24%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.96) 100%);
+    font-family: 'Sofia Sans', 'Inter', system-ui, sans-serif;
+    font-weight: 450;
+    font-feature-settings: 'ss01', 'cv11';
+    letter-spacing: -0.005em;
   }
 
-  .dark body {
-    background-image:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 30%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.1), transparent 22%),
-      radial-gradient(circle at bottom center, rgba(14, 165, 233, 0.08), transparent 28%),
-      linear-gradient(180deg, rgba(3, 13, 18, 0.98) 0%, rgba(7, 20, 28, 1) 52%, rgba(2, 8, 14, 1) 100%);
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sofia Sans', 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: hsl(var(--foreground));
   }
 
   ::selection {
-    background: rgba(13, 148, 136, 0.2);
+    background: hsl(var(--accent) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  /* Editorial body text uses the 450 half-step weight Mastercard relies on. */
+  p, li, span, label, div {
+    font-feature-settings: 'ss01';
   }
 }
 
 @layer components {
+  /*
+   * Layout primitives
+   */
   .app-shell {
-    @apply relative flex h-full flex-col overflow-hidden p-3 sm:p-4;
+    @apply relative flex h-full flex-col overflow-hidden bg-background p-4 sm:p-6;
   }
 
-  .app-shell::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      linear-gradient(rgba(13, 148, 136, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(13, 148, 136, 0.04) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 78%);
-  }
-
-  .dark .app-shell::before {
-    background-image:
-      linear-gradient(rgba(45, 212, 191, 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(45, 212, 191, 0.06) 1px, transparent 1px);
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 82%);
-  }
-
+  /* Floating nav pill: the signature Mastercard dock. */
   .toolbar-shell {
-    @apply relative z-10 flex flex-col gap-3 rounded-[1.5rem] border border-white/60 bg-white/80 px-4 py-3 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70;
+    @apply relative z-10 flex flex-col gap-3 rounded-[2rem] border border-border/70 bg-white px-5 py-3 shadow-[0_4px_24px_rgba(20,20,19,0.04)] dark:bg-[hsl(60_3%_14%)] dark:border-white/5;
   }
 
+  /* Lifted cream — the "paper on paper" surface for sidebar/panels. */
   .panel-surface {
-    @apply rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_16px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70;
+    @apply rounded-[2.5rem] border border-border/60 bg-card text-card-foreground shadow-[0_24px_48px_rgba(20,20,19,0.06)];
   }
 
+  /* Muted inline chip/row (e.g. hover cards, subdued sections). */
   .panel-muted {
-    @apply rounded-[1.25rem] border border-border/70 bg-background/70;
+    @apply rounded-[1.75rem] border border-border/60 bg-card;
   }
 
+  /* Compact stat / meta pill used inside toolbars & panels. */
   .meta-pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/85 px-3 py-1.5 text-xs font-semibold text-muted-foreground;
+    @apply inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground;
+    letter-spacing: -0.01em;
   }
 
+  /* Eyebrow label — uppercase + accent dot. One of the core identity gestures. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: hsl(19 90% 54%);
+    display: inline-block;
+  }
+
+  /* Editorial display type */
+  .display-hero {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .display-h2 {
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    line-height: 1.22;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  .display-h3 {
+    @apply text-2xl font-medium;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  /*
+   * PDF viewer stage — the canvas the PDF itself sits on.
+   * No gradient, no grid — soft cream paper treatment.
+   */
   .viewer-stage {
-    @apply relative overflow-auto rounded-[1.75rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(240,253,250,0.96))] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.76),rgba(3,7,18,0.92))] sm:p-6;
+    @apply relative overflow-auto rounded-[2.5rem] border border-border/60 bg-card p-4 shadow-[0_24px_48px_rgba(20,20,19,0.06)] sm:p-8;
   }
 
   .viewer-grid {
-    background-image:
-      linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
-    background-size: 32px 32px;
+    /* intentionally empty — pure cream */
   }
 
   .empty-state-grid {
-    background-image:
-      radial-gradient(circle at 20% 20%, rgba(13, 148, 136, 0.1), transparent 24%),
-      radial-gradient(circle at 80% 0%, rgba(249, 115, 22, 0.12), transparent 22%);
+    /* intentionally empty — pure cream */
   }
 
+  /*
+   * Landing state (no document open).
+   * Editorial: centered cream hero, ghost-style watermark headline, single CTA.
+   */
   .landing-stage {
-    @apply relative flex h-full min-h-[560px] items-center justify-center overflow-hidden rounded-[1.75rem];
-    background:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 32%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.18), transparent 28%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(240, 253, 250, 0.94));
+    @apply relative flex h-full min-h-[560px] items-center justify-center overflow-hidden rounded-[2.5rem] bg-card;
   }
 
-  .dark .landing-stage {
-    background:
-      radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 28%),
-      radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 24%),
-      radial-gradient(circle at bottom center, rgba(14, 165, 233, 0.08), transparent 26%),
-      linear-gradient(180deg, rgba(8, 19, 27, 0.94), rgba(3, 10, 17, 0.98));
-  }
-
-  .landing-stage::before,
-  .landing-stage::after {
-    content: '';
-    position: absolute;
-    inset: -12%;
-    pointer-events: none;
-    border-radius: 9999px;
-    filter: blur(28px);
-    opacity: 0.9;
-    animation: landing-drift 16s ease-in-out infinite alternate;
-  }
-
-  .landing-stage::before {
-    background:
-      radial-gradient(circle at 30% 40%, rgba(13, 148, 136, 0.2), transparent 28%),
-      radial-gradient(circle at 70% 30%, rgba(249, 115, 22, 0.14), transparent 24%);
-  }
-
-  .dark .landing-stage::before {
-    background:
-      radial-gradient(circle at 30% 40%, rgba(45, 212, 191, 0.18), transparent 28%),
-      radial-gradient(circle at 70% 30%, rgba(249, 115, 22, 0.1), transparent 22%);
-  }
-
-  .landing-stage::after {
-    animation-duration: 20s;
-    animation-direction: alternate-reverse;
-    background:
-      radial-gradient(circle at 20% 80%, rgba(13, 148, 136, 0.12), transparent 24%),
-      radial-gradient(circle at 80% 72%, rgba(14, 165, 233, 0.1), transparent 20%);
-  }
-
-  .dark .landing-stage::after {
-    background:
-      radial-gradient(circle at 20% 80%, rgba(45, 212, 191, 0.12), transparent 22%),
-      radial-gradient(circle at 80% 72%, rgba(56, 189, 248, 0.1), transparent 18%);
-  }
-
-  .landing-grid {
+  .landing-watermark {
     position: absolute;
     inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
-    background-image:
-      linear-gradient(rgba(13, 148, 136, 0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(13, 148, 136, 0.08) 1px, transparent 1px);
-    background-size: 44px 44px;
-    mask-image: radial-gradient(circle at center, black 32%, transparent 85%);
-    animation: landing-grid-shift 24s linear infinite;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: hsl(30 13% 88%);
+    font-size: clamp(4rem, 10vw, 9rem);
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    user-select: none;
   }
 
-  .dark .landing-grid {
-    background-image:
-      linear-gradient(rgba(45, 212, 191, 0.09) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(45, 212, 191, 0.09) 1px, transparent 1px);
-    mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.92) 28%, transparent 82%);
-  }
-
-  .landing-orb {
-    position: absolute;
-    border-radius: 9999px;
-    filter: blur(4px);
-    opacity: 0.8;
-    animation: landing-float 12s ease-in-out infinite;
-  }
-
-  .landing-orb-one {
-    top: 14%;
-    left: 12%;
-    height: 160px;
-    width: 160px;
-    background: radial-gradient(circle, rgba(13, 148, 136, 0.2), transparent 68%);
-  }
-
-  .dark .landing-orb-one {
-    background: radial-gradient(circle, rgba(45, 212, 191, 0.18), transparent 66%);
-  }
-
-  .landing-orb-two {
-    right: 10%;
-    bottom: 12%;
-    height: 220px;
-    width: 220px;
-    background: radial-gradient(circle, rgba(249, 115, 22, 0.18), transparent 70%);
-    animation-delay: -4s;
-  }
-
-  .dark .landing-orb-two {
-    background: radial-gradient(circle, rgba(249, 115, 22, 0.14), transparent 68%);
+  .dark .landing-watermark {
+    color: hsl(60 3% 16%);
   }
 
   .landing-content {
-    @apply relative z-10 flex w-full max-w-3xl justify-center px-4 sm:px-8;
+    @apply relative z-10 flex w-full max-w-2xl justify-center px-4 sm:px-8;
   }
 
+  /*
+   * The PDF canvas itself — render surface for pdfjs.
+   * Soft cream halo, 20px radius.
+   */
   .pdf-canvas {
     display: block;
     margin: 0 auto;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+    border-radius: 1.25rem;
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 24px 48px rgba(20, 20, 19, 0.08);
+    background: white;
   }
-}
 
-@keyframes landing-drift {
-  0% {
-    transform: translate3d(-2%, -1%, 0) scale(1);
+  /*
+   * Satellite CTA — the white circle with an arrow that docks onto
+   * circular portraits. Used rarely in a dashboard UI but available for
+   * hero/onboarding surfaces.
+   */
+  .satellite-cta {
+    @apply inline-flex h-14 w-14 items-center justify-center rounded-full border border-border/50 bg-white text-foreground shadow-[0_8px_24px_rgba(20,20,19,0.08)] transition-transform active:scale-95;
   }
-  100% {
-    transform: translate3d(2%, 3%, 0) scale(1.08);
-  }
-}
 
-@keyframes landing-grid-shift {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  100% {
-    transform: translate3d(44px, 44px, 0);
-  }
-}
-
-@keyframes landing-float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -18px, 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-stage::before,
-  .landing-stage::after,
-  .landing-grid,
-  .landing-orb {
-    animation: none;
+  .satellite-cta.is-small {
+    @apply h-10 w-10;
   }
 }
 
@@ -330,7 +289,6 @@ textarea,
     transform 180ms ease;
 }
 
-/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -341,9 +299,9 @@ textarea,
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-muted-foreground/30;
+  @apply rounded-full bg-muted-foreground/25;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/50;
+  @apply bg-muted-foreground/45;
 }

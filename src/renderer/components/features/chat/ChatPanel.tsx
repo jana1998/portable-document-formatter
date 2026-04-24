@@ -49,7 +49,8 @@ export function ChatPanel({ open, onOpenChange, onOpenSettings }: ChatPanelProps
     if (backend === 'anthropic' || backend === 'openai') {
       void window.electronAPI.llmHasApiKey(backend).then(setHasKey);
     } else {
-      setHasKey(false);
+      // Local backend has no API key requirement.
+      setHasKey(true);
     }
   }, [open, backend]);
 
@@ -60,9 +61,12 @@ export function ChatPanel({ open, onOpenChange, onOpenSettings }: ChatPanelProps
   const canChat = useMemo(() => {
     if (!currentDocument) return false;
     if (pageEmbeddings.size === 0) return false;
-    if (backend === 'local') return false;
+    if (backend === 'local') return true;
     return hasKey;
   }, [currentDocument, pageEmbeddings.size, backend, hasKey]);
+
+  const backendLabel =
+    backend === 'anthropic' ? 'Claude' : backend === 'openai' ? 'OpenAI' : 'local model';
 
   const statusHint = useMemo(() => {
     if (!currentDocument) return 'Open a PDF to start chatting.';
@@ -70,16 +74,16 @@ export function ChatPanel({ open, onOpenChange, onOpenSettings }: ChatPanelProps
       return 'Indexing the document for AI search…';
     }
     if (pageEmbeddings.size === 0) {
-      return 'No text to chat with yet. Run OCR (scan-like PDFs) so the chat has something to work with.';
+      return 'No text to chat with yet. Run OCR (for scans) or open a born-digital PDF so the chat has something to work with.';
     }
     if (backend === 'local') {
-      return 'Local LLM is coming in v1.1. Switch to Claude or OpenAI in AI settings for now.';
+      return 'Ready. Responses stream from the on-device model (SmolLM2). First use downloads ~360MB.';
     }
     if (!hasKey) {
-      return `Add a ${backend === 'anthropic' ? 'Claude' : 'OpenAI'} API key in AI settings to start chatting.`;
+      return `Add a ${backendLabel} API key in AI settings to start chatting — or switch to the local model.`;
     }
-    return `Ready. Responses via ${backend === 'anthropic' ? 'Claude' : 'OpenAI'}.`;
-  }, [currentDocument, isIndexingEmbeddings, pageEmbeddings.size, backend, hasKey]);
+    return `Ready. Responses via ${backendLabel}.`;
+  }, [currentDocument, isIndexingEmbeddings, pageEmbeddings.size, backend, hasKey, backendLabel]);
 
   const buildContext = async (query: string) => {
     const queryVec = await window.electronAPI.embedText(query);
