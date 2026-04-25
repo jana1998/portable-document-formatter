@@ -5,7 +5,7 @@
 
   ### 🚀 A Modern, Feature-Rich PDF Editor Built with Electron
 
-  **View • Annotate • Edit • OCR • Export** — All in one beautiful desktop app
+  **View • Annotate • Edit • OCR • Export • Mobile Companion** — All in one beautiful desktop app
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Electron](https://img.shields.io/badge/Electron-28-blue.svg)](https://www.electronjs.org/)
@@ -45,7 +45,13 @@
 - 📑 **Selective Export** — Save specific page ranges (e.g., "1-3, 5, 7-9")
 - ✅ **Embed Modifications** — All edits are permanently embedded in exported PDFs
 - 🔒 **Preserve Quality** — No loss of quality during save operations
-- 📤 **Multiple Formats** — Export with all annotations and overlays intact
+
+### 📱 **Mobile Companion (LAN)**
+- 🔌 **In-app server** — Toggle the companion on from Settings to expose the renderer over your local WiFi
+- 📷 **QR pairing** — Scan a QR on the desktop to load the app on your phone with a one-shot bearer token
+- 🗂️ **Library folder** — Pick a folder on the desktop; only PDFs in it are visible to the phone
+- ✏️ **Edit & save remotely** — Annotate on the phone; save lands in the desktop folder *and* downloads to the phone
+- 🛡️ **Path-safe** — All file paths are validated via `realpath`; rate-limited token auth; tokens rotate on disable
 
 ---
 
@@ -135,6 +141,24 @@ npm run build
 3. Select output location
 4. Your new PDF will include all edits and annotations!
 
+### 📱 Using the Mobile Companion
+
+The Mobile Companion lets a phone on the same WiFi load the app over the LAN and edit PDFs from a folder you choose on the desktop.
+
+1. On the **desktop**, click the **gear icon** in the toolbar to open Settings.
+2. Click **Choose folder** and pick a directory containing the PDFs you want to access from your phone.
+3. Click **Enable**. A QR code and a list of LAN URLs appear (e.g. `http://192.168.1.42:8421`).
+4. **Scan the QR with your phone's camera.** The renderer loads on the phone and the pairing token is stored in `localStorage`.
+5. Tap **Open PDF** on the phone — pick a file from the library, view it, annotate, and tap **Save**. The edited PDF lands in the desktop folder *and* downloads to the phone.
+
+Notes:
+- Scan the QR — don't paste `vite --host`'s URL. Vite (port `5173`) is just a dev bundler; the companion server runs on its own port (default `8421`).
+- Click **Disable** in Settings to stop the server. The bearer token rotates automatically on disable.
+- iOS Safari sometimes inline-previews the saved PDF instead of triggering a download — the desktop folder still gets the file.
+- macOS may show a one-time firewall prompt the first time you enable. Click **Allow** so phones on your WiFi can reach the server.
+
+> **Out of scope on mobile (v1):** OCR, embeddings, the local LLM, page management, and "save specific pages." These remain on the desktop.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -150,11 +174,11 @@ Built with modern, production-ready technologies:
 | 🧩 **Radix UI** | Accessible component primitives |
 | 📄 **PDF.js** | PDF rendering engine |
 | 📝 **pdf-lib** | PDF manipulation and creation |
-| 🤖 **MarkItDown** | Primary multi-format extraction engine |
-| ⚡ **FastAPI** | Python microservice for document processing |
-| 📦 **Dexie.js** | IndexedDB wrapper for result caching |
-| 🤖 **Tesseract.js** | Fallback OCR for local image processing |
+| 📐 **mupdf** | Structured text extraction for in-place editing |
+| 🤖 **PaddleOCR (`@gutenye/ocr-node`)** | OCR text extraction in a `utilityProcess` |
+| 🧠 **`@huggingface/transformers`** | On-device embeddings (MiniLM) and LLM (SmolLM2) |
 | 🐻 **Zustand** | Lightweight state management |
+| 🌐 **Node `http` + `qrcode`** | Mobile companion server + QR pairing |
 | ⚡ **Vite** | Lightning-fast build tool |
 | 🧪 **Vitest** | Modern testing framework |
 | 🎭 **Playwright** | End-to-end testing |
@@ -165,20 +189,20 @@ Built with modern, production-ready technologies:
 
 ```mermaid
 flowchart LR
-    User[👤 User] --> Toolbar[🎛️ Toolbar & Sidebar]
-    Toolbar --> Viewer[📄 PDF Viewer]
-    Viewer --> Overlays[✨ Search, Annotations, Overlays]
-    Toolbar --> OCR[🤖 OCR Engine]
-    Toolbar --> Save[💾 Save Dialog]
-    Viewer --> Store[🐻 Zustand Store]
-    OCR --> Store
-    Save --> IPC[⚡ Electron IPC]
+    Desktop[👤 Desktop renderer] --> IPC[⚡ Electron IPC]
+    Phone[📱 Phone renderer] -- HTTP + bearer token --> Companion[🌐 Companion server]
     IPC --> Main[🖥️ Main Process]
-    Main --> PDFService[📄 PDF Service]
+    Companion --> Main
+    Main --> PDFService[📄 pdf-lib + mupdf]
     Main --> FileService[📁 File Service]
+    Main --> OCR[🤖 OCR utilityProcess]
+    Main --> Embeddings[🧠 Embeddings utilityProcess]
+    Main --> LLM[💬 LLM utilityProcess]
     PDFService --> Files[(💾 PDF Files)]
     FileService --> Files
 ```
+
+The desktop renderer talks to the main process over Electron IPC (via `window.electronAPI` from `preload.ts`). The mobile renderer is the **same React bundle** loaded over LAN HTTP — at boot, a polyfill at `src/renderer/services/electron-api-http.ts` installs `window.electronAPI` shims that translate the same calls into HTTP requests against the companion server, which calls into the same service singletons. This means a single renderer codebase works on both transports.
 
 📚 **Detailed Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md) for in-depth technical documentation.
 
@@ -189,37 +213,62 @@ flowchart LR
 ```
 portable-document-formatter/
 ├── 📂 src/
-│   ├── 🖥️ main/              # Electron main process
-│   │   ├── main.ts           # Entry point & IPC handlers
-│   │   └── services/         # PDF and file services
-│   ├── ⚛️ renderer/          # React application
-│   │   ├── components/       # UI components
-│   │   ├── store/            # Zustand state management
-│   │   └── types/            # TypeScript definitions
-│   ├── 🧪 tests/             # Vitest unit tests
-│   ├── 🎭 e2e/               # Playwright E2E tests
-│   └── 👷 workers/           # Web workers (OCR)
-├── 📂 public/                # Static assets
-├── 📂 dist/                  # Build output
-└── 📂 release/               # Distribution packages
+│   ├── 🖥️ main/                                  # Electron main process
+│   │   ├── main.ts                               # Entry point & IPC handlers
+│   │   ├── preload.ts                            # contextBridge → window.electronAPI
+│   │   ├── services/
+│   │   │   ├── pdf-service.ts                    # pdf-lib + mupdf editing
+│   │   │   ├── file-service.ts                   # FS helpers
+│   │   │   ├── ocr-service.ts                    # PaddleOCR utilityProcess driver
+│   │   │   ├── embeddings-service.ts             # MiniLM utilityProcess driver
+│   │   │   ├── llm-service.ts                    # SmolLM2 utilityProcess driver
+│   │   │   ├── companion-config.ts               # Persisted token / port / library
+│   │   │   ├── companion-server.ts               # HTTP server lifecycle
+│   │   │   └── companion-routes.ts               # /api/* handlers
+│   │   └── workers/                              # OCR / embeddings / LLM workers
+│   ├── ⚛️ renderer/                              # React application
+│   │   ├── components/                           # UI components
+│   │   │   ├── features/settings/SettingsDialog  # Companion toggle + QR
+│   │   │   └── features/library/LibraryPicker    # Mobile file picker
+│   │   ├── services/
+│   │   │   └── electron-api-http.ts              # window.electronAPI HTTP polyfill
+│   │   ├── store/                                # Zustand state management
+│   │   └── types/                                # TypeScript definitions
+│   ├── 🧪 tests/                                 # Vitest unit tests
+│   ├── 🎭 e2e/                                   # Playwright E2E tests
+│   └── 👷 workers/                               # Web workers
+├── 📂 public/                                    # Static assets
+├── 📂 dist/                                      # Build output (renderer served by companion)
+└── 📂 release/                                   # Distribution packages
 ```
 
 ---
 
 ## 🗺️ Roadmap
 
-### 🚧 In Progress (Phase 1: Foundation & Migration)
-- [x] Multi-format extraction (PDF, DOCX, PPTX, XLSX) via Microsoft MarkItDown
-- [x] FastAPI microservice integration
-- [x] Strategy Pattern for pluggable document processors
-- [x] Persistent result caching with IndexedDB (Dexie.js)
-- [ ] Final GA sign-off and stability testing
+### ✅ Completed
+- [x] PDF viewing with zoom and navigation
+- [x] Annotation system with comments
+- [x] Text and image overlays
+- [x] Full-text search with highlighting
+- [x] OCR with Tesseract.js
+- [x] Selective page export
+- [x] Dark mode support
+- [x] Thumbnail navigation
 
-### 🗺️ Future Roadmap
-- [ ] LLM-assisted document analysis (Phase 2)
+### ✅ Recently Added
+- [x] In-place text editing via mupdf structured-text extraction
+- [x] PaddleOCR pipeline running in an Electron `utilityProcess` (replaces Tesseract)
+- [x] On-device semantic search using MiniLM embeddings + sidecar caching
+- [x] On-device LLM (SmolLM2) wired through streaming IPC
+- [x] Mobile Companion — LAN HTTP server + QR pairing, edit & save from phone
+
+### 🚧 In Progress
 - [ ] Page management (reorder, delete, rotate)
 - [ ] Export to images (PNG/JPEG)
 - [ ] Enhanced annotation tools (shapes, arrows)
+- [ ] Companion v1.5: HTTPS via self-signed cert (unlocks iOS clipboard write)
+- [ ] Companion v2: WebSocket transport for streaming OCR/LLM on mobile
 
 ### 🔮 Future Plans
 - [ ] Cloud storage integration (Google Drive, Dropbox)
@@ -348,6 +397,16 @@ Output files will be in the `release/` directory.
 - Click "More info" then "Run anyway"
 - For production use, code-sign with `npm run dist:win:signed`
 
+### Mobile companion: phone shows `Unexpected token '<', "<!DOCTYPE..."`
+- Your phone is hitting the Vite dev server (port `5173`) instead of the companion server (port `8421`).
+- Vite returns the SPA `index.html` for any unknown URL, so `/api/library/list` becomes HTML and `JSON.parse` fails.
+- Fix: open the QR from **Settings** on the desktop and scan it from the phone — it points to the correct companion port.
+
+### Mobile companion: phone times out after scanning the QR
+- Your desktop probably has a VPN, Docker network, or virtual interface advertising the wrong IP.
+- The Settings dialog lists all detected LAN URLs — tap each one in turn until one works, or temporarily disable VPN/Docker.
+- macOS firewall may have blocked the first bind silently; check **System Settings → Network → Firewall**.
+
 ---
 
 ## 📄 License
@@ -387,8 +446,10 @@ Built with amazing open-source projects:
 - [React](https://reactjs.org/) - UI library
 - [PDF.js](https://mozilla.github.io/pdf.js/) - PDF rendering by Mozilla
 - [pdf-lib](https://pdf-lib.js.org/) - PDF manipulation
-- [MarkItDown](https://github.com/microsoft/markitdown) - Primary multi-format extraction engine
-- [Tesseract.js](https://tesseract.projectnaptha.com/) - Fallback OCR engine
+- [mupdf](https://mupdf.com/) - Structured-text extraction
+- [@gutenye/ocr-node](https://github.com/gutenye/ocr) - PaddleOCR for Node
+- [@huggingface/transformers](https://github.com/huggingface/transformers.js) - On-device ML
+- [qrcode](https://github.com/soldair/node-qrcode) - QR rendering for companion pairing
 - [Radix UI](https://www.radix-ui.com/) - Accessible components
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
 

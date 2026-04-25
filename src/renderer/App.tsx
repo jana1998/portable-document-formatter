@@ -1,19 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, FileText, FileUp } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, FileUp, PanelLeft, PanelLeftClose, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { TooltipProvider } from '@components/ui/tooltip';
 import { Toaster } from '@components/ui/toaster';
 import { LoadingSpinner } from '@components/ui/loading-spinner';
 import { Toolbar } from '@components/common/Toolbar';
+import { WelcomeHero } from '@components/common/WelcomeHero';
 import { Sidebar } from '@components/common/Sidebar';
 import { PDFViewer } from '@components/features/viewer/PDFViewer';
-import { EmptyState } from '@components/ui/empty-state';
-import { PanelCard, PanelCardContent } from '@components/ui/panel-card';
+import { FloatingToolbar } from '@components/features/viewer/FloatingToolbar';
+import { ReaderMode } from '@components/features/reader/ReaderMode';
+import { SettingsDialog } from '@components/features/settings/SettingsDialog';
+import { LibraryPicker } from '@components/features/library/LibraryPicker';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { cn } from '@renderer/lib/utils';
 
 function App() {
-  const { currentDocument, isSidebarOpen, isToolbarCollapsed, setIsDarkMode, error } = usePDFStore();
+  const {
+    currentDocument,
+    currentPage,
+    totalPages,
+    scale,
+    isSidebarOpen,
+    isReaderMode,
+    setCurrentPage,
+    setScale,
+    setIsSidebarOpen,
+    setIsDarkMode,
+    error,
+    isLibraryPickerOpen,
+    setIsLibraryPickerOpen,
+    isSettingsDialogOpen,
+    setIsSettingsDialogOpen,
+  } = usePDFStore();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -23,20 +42,21 @@ function App() {
   }, [setIsDarkMode]);
 
   const handleOpenFile = async () => {
+    if (window.electronAPI?.companionMode) {
+      setIsLibraryPickerOpen(true);
+      return;
+    }
     try {
       const fileInfo = await window.electronAPI.openFile();
       if (!fileInfo) return;
-
-      const pdfDoc = {
+      usePDFStore.getState().setCurrentDocument({
         id: Date.now().toString(),
         name: fileInfo.name,
         path: fileInfo.path,
         pageCount: 0,
         fileSize: fileInfo.size,
         loadedAt: new Date(),
-      };
-
-      usePDFStore.getState().setCurrentDocument(pdfDoc);
+      });
     } catch (openError) {
       console.error('Failed to open file:', openError);
     }
@@ -46,11 +66,11 @@ function App() {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="panel-surface w-full max-w-md p-10 text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-button bg-primary/10 text-primary">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-foreground">
             <LoadingSpinner size="lg" />
           </div>
-          <h2 className="text-lg font-medium tracking-tight text-foreground">Preparing workspace</h2>
-          <p className="mt-3 text-sm font-normal leading-relaxed text-muted-foreground">
+          <p className="display-h3">Preparing workspace</p>
+          <p className="mt-2 text-sm text-muted-foreground">
             Initializing the PDF editor and loading your desktop tools.
           </p>
         </div>
@@ -60,66 +80,145 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="app-shell">
+      {/* Floating toolbar — fixed over the canvas, not in the layout flow */}
+      <div className="fixed inset-x-2 top-2 z-30 sm:inset-x-3 sm:top-3">
         <Toolbar />
+      </div>
 
-        <div className={cn(
-          "relative z-10 flex min-h-0 flex-1 gap-3 transition-[margin] duration-200",
-          isToolbarCollapsed ? "mt-2" : "mt-3"
-        )}>
-          <div className="h-full w-[22rem] shrink-0">
+      <div className="app-shell">
+        {/* Content fills the full padded area; the toolbar floats over the top */}
+        <div className="relative z-10 flex min-h-0 flex-1 gap-0 px-2 pt-[64px] pb-2 sm:gap-4 sm:px-3 sm:pt-[68px] sm:pb-3">
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 z-30 bg-black/40 sm:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+
+          <div
+            className={`min-w-0 overflow-hidden transition-[width,opacity,transform,margin] duration-300 ${
+              isSidebarOpen
+                ? 'max-sm:fixed max-sm:inset-y-0 max-sm:left-0 max-sm:z-40 max-sm:w-80 max-sm:shadow-xl sm:w-[22rem] sm:opacity-100'
+                : 'max-sm:pointer-events-none max-sm:fixed max-sm:inset-y-0 max-sm:left-0 max-sm:z-40 max-sm:w-80 max-sm:-translate-x-full max-sm:opacity-0 sm:m-0 sm:w-0 sm:opacity-0'
+            }`}
+          >
             <Sidebar />
           </div>
 
           <main className="min-w-0 flex-1">
             {currentDocument ? (
               <div className="flex h-full flex-col gap-3">
-                {error ? (
-                  <div className="panel-surface flex items-center gap-4 border-destructive/30 px-5 py-4 text-sm">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-button bg-destructive/10 text-destructive">
+                {error && (
+                  <div className="panel-surface flex items-center gap-3 border-destructive/30 px-4 py-3 text-sm" style={{ marginTop: '3.5rem' }}>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
                       <AlertTriangle className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium tracking-tight text-foreground">Rendering issue detected</p>
-                      <p className="mt-0.5 font-normal text-muted-foreground">{error}</p>
+                      <p className="font-medium text-foreground">Rendering issue detected</p>
+                      <p className="text-muted-foreground">{error}</p>
                     </div>
                   </div>
-                ) : null}
-
+                )}
                 <div className="min-h-0 flex-1">
                   <PDFViewer />
                 </div>
               </div>
             ) : (
-              <PanelCard className="h-full overflow-hidden">
-                <PanelCardContent className="h-full p-0">
-                  <div className="landing-stage">
-                    <div className="landing-grid" />
-                    <div className="landing-orb landing-orb-one" />
-                    <div className="landing-orb landing-orb-two" />
-
-                    <div className="landing-content">
-                      <EmptyState
-                        icon={FileText}
-                        title="Open a PDF to begin"
-                        description="Your workspace is ready for markup, text edits, image inserts, OCR, and search. Start with a document and the editor will expand into the full production layout."
-                        action={(
-                          <Button onClick={handleOpenFile} className="gap-2" size="lg">
-                            <FileUp className="h-4 w-4" />
-                            Open PDF
-                          </Button>
-                        )}
-                        className="w-full max-w-2xl border-border/30 bg-card/70 px-10 py-16 shadow-[0_24px_48px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-border/20 dark:bg-card/60 dark:shadow-[0_24px_48px_rgba(0,0,0,0.2)]"
-                      />
-                    </div>
+              /* Landing: pt-14 shifts the centering origin below the toolbar */
+              <div className="landing-stage pt-14">
+                <div className="landing-content">
+                  <div className="w-full max-w-xl text-center">
+                    <WelcomeHero />
+                    <Button onClick={handleOpenFile} size="lg" className="gap-2">
+                      <FileUp className="h-4 w-4" />
+                      Open PDF
+                    </Button>
                   </div>
-                </PanelCardContent>
-              </PanelCard>
+                </div>
+              </div>
             )}
           </main>
         </div>
       </div>
+
+      {/* Floating bottom bar — page nav + zoom */}
+      {currentDocument && !isReaderMode && (
+        <div
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-border/70 bg-background/95 px-3 py-2 shadow-[0_8px_32px_rgba(20,20,19,0.10)] backdrop-blur-sm ${
+            isSidebarOpen ? 'z-40' : 'z-20'
+          }`}
+        >
+          {/* Sidebar toggle — mobile only */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 rounded-full p-0 sm:hidden"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            aria-label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          >
+            {isSidebarOpen ? (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeft className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <div className="mx-1 h-4 w-px bg-border/60 sm:hidden" />
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 rounded-full p-0"
+            onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <span className="min-w-[56px] text-center text-xs font-semibold text-foreground tabular-nums">
+            {currentPage} / {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 rounded-full p-0"
+            onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+
+          <div className="mx-1 h-4 w-px bg-border/60" />
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 rounded-full p-0"
+            onClick={() => setScale(Math.max(scale - 0.25, 0.5))}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <span className="min-w-[36px] text-center text-xs font-semibold text-foreground tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 rounded-full p-0"
+            onClick={() => setScale(Math.min(scale + 0.25, 3))}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      <FloatingToolbar />
       <Toaster />
+      {isReaderMode && <ReaderMode />}
+      <SettingsDialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen} />
+      <LibraryPicker open={isLibraryPickerOpen} onOpenChange={setIsLibraryPickerOpen} />
     </TooltipProvider>
   );
 }

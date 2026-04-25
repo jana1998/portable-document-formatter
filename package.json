@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
-    "dev:renderer": "vite",
+    "dev:renderer": "vite --host",
     "dev:electron": "npm run build:main && wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
     "build": "npm run build:renderer && npm run build:main",
     "build:renderer": "vite build",
@@ -27,6 +27,8 @@
     "dist:win:signed": "npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
+    "@gutenye/ocr-node": "^1.4.8",
+    "@huggingface/transformers": "^4.2.0",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-select": "^2.0.0",
@@ -35,16 +37,18 @@
     "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-toast": "^1.2.15",
     "@radix-ui/react-tooltip": "^1.0.7",
+    "@types/qrcode": "^1.5.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
     "mupdf": "^1.27.0",
+    "onnxruntime-node": "^1.24.3",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.2.0",
-    "tesseract.js": "^5.0.4",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
@@ -93,6 +97,23 @@
       "!node_modules/canvas{,/**/*}",
       "!src/**/*",
       "!dist/**/*.map"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**",
+      "node_modules/@gutenye/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/mupdf/**",
+      "resources/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

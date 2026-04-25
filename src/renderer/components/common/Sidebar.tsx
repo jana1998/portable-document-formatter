@@ -1,118 +1,103 @@
 import React from 'react';
-import { Files, MessageSquare, Search, PanelLeftClose, PanelLeft } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
-import { PanelCard, PanelCardDescription, PanelCardHeader, PanelCardTitle } from '@components/ui/panel-card';
+import { Files, MessageSquare, PanelLeftClose, Search } from 'lucide-react';
 import { Button } from '@components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@components/ui/tooltip';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { ThumbnailsPanel } from '@components/features/viewer/ThumbnailsPanel';
 import { AnnotationsPanel } from '@components/features/annotations/AnnotationsPanel';
 import { SearchPanel } from '@components/features/search/SearchPanel';
+import { cn } from '@renderer/lib/utils';
 
-const tabConfig = [
+type TabValue = 'thumbnails' | 'annotations' | 'search';
+
+const tabs: Array<{ value: TabValue; label: string; icon: typeof Files }> = [
   { value: 'thumbnails', label: 'Pages', icon: Files },
   { value: 'annotations', label: 'Notes', icon: MessageSquare },
   { value: 'search', label: 'Search', icon: Search },
-] as const;
+];
 
 export function Sidebar() {
-  const { sidebarTab, setSidebarTab, totalPages, annotations, searchResults, isSidebarOpen, setIsSidebarOpen } = usePDFStore();
+  const { sidebarTab, setSidebarTab, totalPages, annotations, searchResults, setIsSidebarOpen } =
+    usePDFStore();
 
   const annotationCount = Array.from(annotations.values()).reduce(
-    (total, pageAnnotations) => total + pageAnnotations.length,
+    (sum, a) => sum + a.length,
     0
   );
 
-  const tabStats = {
-    thumbnails: `${totalPages || 0} page${totalPages === 1 ? '' : 's'}`,
-    annotations: `${annotationCount} annotation${annotationCount === 1 ? '' : 's'}`,
-    search: `${searchResults.length} result${searchResults.length === 1 ? '' : 's'}`,
+  const counts: Record<TabValue, number> = {
+    thumbnails: totalPages || 0,
+    annotations: annotationCount,
+    search: searchResults.length,
   };
 
   return (
-    <div className="relative h-full">
-      {/* Toggle Button - Always Visible */}
-      <div className="absolute left-0 top-0 z-20 p-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-              className="bg-card/90 shadow-sm hover:bg-card"
-            >
-              {isSidebarOpen ? (
-                <PanelLeftClose className="h-4 w-4" />
-              ) : (
-                <PanelLeft className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Sidebar Content */}
-      <PanelCard
-        className={`flex h-full flex-col overflow-hidden transition-all duration-200 ease-out ${
-          isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-[calc(100%-3.5rem)] opacity-50'
-        }`}
-        style={{ willChange: isSidebarOpen ? 'auto' : 'transform' }}
+    <div className="flex h-full flex-col overflow-hidden rounded-[2rem] border border-border/50 bg-card shadow-[0_8px_40px_rgba(20,20,19,0.07)]">
+      <Tabs
+        value={sidebarTab}
+        onValueChange={(v) => setSidebarTab(v as TabValue)}
+        className="flex h-full flex-col"
       >
-        <Tabs
-          value={sidebarTab}
-          onValueChange={(value) => setSidebarTab(value as (typeof tabConfig)[number]['value'])}
-          className="flex h-full flex-col"
-        >
-          <PanelCardHeader className="flex-col gap-4 border-b border-border/40 pb-5 pl-16 pr-5 pt-5">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.04em] text-muted-foreground">
-                • Workspace
-              </p>
-              <PanelCardTitle className="mt-1 text-lg font-medium tracking-tight">
-                Document Panels
-              </PanelCardTitle>
-            </div>
-
-            <PanelCardDescription className="font-normal leading-relaxed">
-              Navigate pages, inspect annotations, and search content.
-            </PanelCardDescription>
-
-            <TabsList className="grid h-auto w-full grid-cols-3 gap-1.5 rounded-button bg-muted/60 p-1.5">
-              {tabConfig.map(({ value, label, icon: Icon }) => (
+        {/* Header — top pt clears the fixed floating toolbar */}
+        <div className="flex shrink-0 items-center gap-2 px-3 pt-3 pb-3">
+          <TabsList className="h-8 flex-1 gap-0 rounded-full bg-muted/50 p-0.5">
+            {tabs.map(({ value, label, icon: Icon }) => {
+              const count = counts[value];
+              const active = sidebarTab === value;
+              return (
                 <TabsTrigger
                   key={value}
                   value={value}
-                  className="flex gap-2 rounded-button font-medium tracking-tight data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-medium"
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3 w-3 shrink-0" />
                   <span className="hidden sm:inline">{label}</span>
+                  {count > 0 && (
+                    <span
+                      className={cn(
+                        'inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none',
+                        active
+                          ? 'bg-background/25 text-current'
+                          : 'bg-muted-foreground/15 text-muted-foreground'
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
                 </TabsTrigger>
-              ))}
-            </TabsList>
+              );
+            })}
+          </TabsList>
 
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-accent" />
-              <span className="text-xs font-semibold text-muted-foreground">
-                {tabStats[sidebarTab]}
-              </span>
-            </div>
-          </PanelCardHeader>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => setIsSidebarOpen(false)}
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Hide sidebar</TooltipContent>
+          </Tooltip>
+        </div>
 
-          <TabsContent value="thumbnails" className="min-h-0 flex-1 overflow-hidden px-5 pb-5 pt-4">
-            <ThumbnailsPanel />
-          </TabsContent>
-          <TabsContent value="annotations" className="min-h-0 flex-1 overflow-hidden px-5 pb-5 pt-4">
-            <AnnotationsPanel />
-          </TabsContent>
-          <TabsContent value="search" className="min-h-0 flex-1 overflow-hidden px-5 pb-5 pt-4">
-            <SearchPanel />
-          </TabsContent>
-        </Tabs>
-      </PanelCard>
+        <div className="mx-3 mb-0 border-t border-border/30" />
+
+        <TabsContent value="thumbnails" className="min-h-0 flex-1 overflow-hidden p-3">
+          <ThumbnailsPanel />
+        </TabsContent>
+        <TabsContent value="annotations" className="min-h-0 flex-1 overflow-hidden p-3">
+          <AnnotationsPanel />
+        </TabsContent>
+        <TabsContent value="search" className="min-h-0 flex-1 overflow-hidden p-3">
+          <SearchPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

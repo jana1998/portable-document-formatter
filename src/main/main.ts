@@ -3,10 +3,18 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { PDFService } from './services/pdf-service';
 import { FileService } from './services/file-service';
+import { OCRService } from './services/ocr-service';
+import { EmbeddingsService, type PageTextInput } from './services/embeddings-service';
+import { LLMService, type LLMGenerateOptions } from './services/llm-service';
+import { companionConfigStore } from './services/companion-config';
+import { companionServer } from './services/companion-server';
 
 let mainWindow: BrowserWindow | null = null;
 const pdfService = new PDFService();
 const fileService = new FileService();
+const ocrService = new OCRService();
+const embeddingsService = new EmbeddingsService();
+const llmService = new LLMService();
 
 function createWindow() {
   // Determine icon path based on environment
@@ -46,9 +54,19 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow();
   setupIPCHandlers();
+
+  // Auto-start companion server if previously enabled.
+  try {
+    const config = await companionConfigStore.load();
+    if (config.enabled && config.libraryPath) {
+      await companionServer.start({ pdfService, fileService });
+    }
+  } catch (error) {
+    console.error('Companion auto-start failed:', error);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -171,4 +189,198 @@ function setupIPCHandlers() {
       throw error;
     }
   });
+
+  // OCR operations — new PaddleOCR-backed pipeline.
+  // Renderer rasterizes each page and ships PNG bytes; text-layer short-circuit
+  // also lives in the renderer (pdfjs-dist is renderer-only).
+  let currentOcrAbort: AbortController | null = null;
+
+  ipcMain.handle(
+    'ocr:recognizePageImage',
+    async (_, pageNumber: number, imageBuffer: Buffer | Uint8Array) => {
+      const bytes = Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
+      currentOcrAbort?.abort();
+      currentOcrAbort = new AbortController();
+      try {
+        return await ocrService.recognizePageImage(pageNumber, bytes, {
+          signal: currentOcrAbort.signal,
+        });
+      } finally {
+        if (currentOcrAbort && !currentOcrAbort.signal.aborted) currentOcrAbort = null;
+      }
+    }
+  );
+
+  ipcMain.handle('ocr:cancel', async () => {
+    currentOcrAbort?.abort();
+    currentOcrAbort = null;
+    return true;
+  });
+
+  ipcMain.handle('ocr:saveSidecar', async (_, pdfPath: string, results: any[]) => {
+    return ocrService.saveSidecar(pdfPath, results);
+  });
+
+  ipcMain.handle('ocr:loadSidecar', async (_, pdfPath: string) => {
+    return ocrService.loadSidecar(pdfPath);
+  });
+
+  ipcMain.handle(
+    'dialog:saveTextFile',
+    async (_, defaultPath: string, filters: { name: string; extensions: string[] }[]) => {
+      const result = await dialog.showSaveDialog({ defaultPath, filters });
+      return result.canceled ? null : result.filePath;
+    }
+  );
+
+  ipcMain.handle('file:writeText', async (_, filePath: string, content: string) => {
+    await fs.writeFile(filePath, content, 'utf-8');
+  });
+
+  ipcMain.handle('ocr:exportPDF', async (_, outputPath: string, text: string) => {
+    const { PDFDocument: LibDoc, StandardFonts, rgb } = await import('pdf-lib');
+    const doc = await LibDoc.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 11;
+    const margin = 50;
+    const lineHeight = fontSize * 1.4;
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const lines = wrapText(text, font, fontSize, pageWidth - margin * 2);
+    let y = pageHeight - margin;
+    let page = doc.addPage([pageWidth, pageHeight]);
+    for (const line of lines) {
+      if (y < margin) {
+        page = doc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+      page.drawText(line, { x: margin, y, font, size: fontSize, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+    }
+    const bytes = await doc.save();
+    await fs.writeFile(outputPath, bytes);
+  });
+
+  // Embeddings (all-MiniLM-L6-v2 via @huggingface/transformers, utilityProcess)
+  ipcMain.handle(
+    'embeddings:embedDocument',
+    async (_, _pdfPath: string, pages: PageTextInput[]) => {
+      return embeddingsService.embedDocument(pages);
+    }
+  );
+
+  ipcMain.handle('embeddings:embedText', async (_, text: string) => {
+    const [vec] = await embeddingsService.embedTexts([text]);
+    return vec ?? null;
+  });
+
+  ipcMain.handle(
+    'embeddings:saveSidecar',
+    async (_, pdfPath: string, embeddings: any[]) => {
+      return embeddingsService.saveSidecar(pdfPath, embeddings);
+    }
+  );
+
+  ipcMain.handle('embeddings:loadSidecar', async (_, pdfPath: string) => {
+    return embeddingsService.loadSidecar(pdfPath);
+  });
+
+  // LLM — on-device only (SmolLM2-360M via @huggingface/transformers in utilityProcess).
+  ipcMain.handle('llm:generate', async (event, prompt: string, options: LLMGenerateOptions) => {
+    return llmService.generate(event.sender, prompt, options ?? {});
+  });
+
+  ipcMain.handle('llm:cancel', async () => {
+    llmService.cancelCurrent();
+    return true;
+  });
+
+  // Mobile companion — desktop hosts an HTTP server so a phone on the same LAN
+  // can use the renderer remotely. v1 supports view + annotate + save.
+  ipcMain.handle('companion:status', async () => {
+    const config = await companionConfigStore.load();
+    const port = companionServer.getActivePort() ?? config.port;
+    return {
+      enabled: config.enabled,
+      running: companionServer.isRunning(),
+      port,
+      token: config.token,
+      libraryPath: config.libraryPath,
+      lanUrls: companionConfigStore.getLanUrls(port),
+    };
+  });
+
+  ipcMain.handle('companion:enable', async () => {
+    const config = await companionConfigStore.load();
+    if (!config.libraryPath) throw new Error('Library folder not selected');
+    if (!companionServer.isRunning()) {
+      await companionServer.start({ pdfService, fileService });
+    }
+    await companionConfigStore.save({ enabled: true });
+    const port = companionServer.getActivePort()!;
+    return {
+      port,
+      token: config.token,
+      libraryPath: config.libraryPath,
+      lanUrls: companionConfigStore.getLanUrls(port),
+    };
+  });
+
+  ipcMain.handle('companion:disable', async () => {
+    await companionServer.stop();
+    await companionConfigStore.save({ enabled: false });
+    // Rotate token on disable so any leaked QR/token can't reattach later.
+    await companionConfigStore.rotateToken();
+    return true;
+  });
+
+  ipcMain.handle('companion:rotateToken', async () => {
+    const next = await companionConfigStore.rotateToken();
+    return { token: next.token };
+  });
+
+  ipcMain.handle('companion:pickLibrary', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose Companion library folder',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const libraryPath = result.filePaths[0];
+    await companionConfigStore.save({ libraryPath });
+    return libraryPath;
+  });
+
+  ipcMain.handle('companion:getLanUrls', async () => {
+    const config = await companionConfigStore.load();
+    const port = companionServer.getActivePort() ?? config.port;
+    return companionConfigStore.getLanUrls(port);
+  });
 }
+
+app.on('before-quit', () => {
+  companionServer.stop().catch(() => undefined);
+  ocrService.shutdown().catch(() => undefined);
+  embeddingsService.shutdown().catch(() => undefined);
+  llmService.cancelCurrent();
+  llmService.shutdown().catch(() => undefined);
+});
+
+function wrapText(text: string, font: { widthOfTextAtSize: (t: string, s: number) => number }, fontSize: number, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const rawLine of text.split('\n')) {
+    const words = rawLine.split(' ');
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? current + ' ' + word : word;
+      if (font.widthOfTextAtSize(candidate, fontSize) > maxWidth && current) {
+        out.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    out.push(current);
+  }
+  return out;
+}
+

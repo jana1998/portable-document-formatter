@@ -167,7 +167,7 @@ export function AnnotationsPanel() {
       </div>
 
       <Dialog open={!!editingAnnotation} onOpenChange={() => setEditingAnnotation(null)}>
-        <DialogContent className="rounded-[1.5rem] border-white/60 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-slate-950/90">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Annotation</DialogTitle>
             <DialogDescription>

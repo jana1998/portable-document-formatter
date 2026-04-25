@@ -42,14 +42,22 @@ interface PDFState {
   ocrResults: Map<number, OCRResult>;
   isProcessingOCR: boolean;
 
+  // Semantic (page embeddings from @huggingface/transformers MiniLM, 384-dim)
+  pageEmbeddings: Map<number, number[]>;
+  isIndexingEmbeddings: boolean;
+
   // UI state
   currentTool: string;
   isSidebarOpen: boolean;
   isToolbarCollapsed: boolean;
   sidebarTab: 'thumbnails' | 'annotations' | 'search';
   isDarkMode: boolean;
+  isReaderMode: boolean;
+  readerEntryPage: number;
   isLoading: boolean;
   error: string | null;
+  isLibraryPickerOpen: boolean;
+  isSettingsDialogOpen: boolean;
 
   // Actions
   setCurrentDocument: (doc: PDFDocument | null) => void;
@@ -83,15 +91,25 @@ interface PDFState {
   setCurrentSearchResultIndex: (index: number) => void;
 
   setOCRResult: (pageNumber: number, result: OCRResult) => void;
+  hydrateOCRResults: (results: OCRResult[]) => void;
   setIsProcessingOCR: (isProcessing: boolean) => void;
+
+  setPageEmbedding: (pageNumber: number, vector: number[]) => void;
+  hydratePageEmbeddings: (entries: Array<{ pageNumber: number; vector: number[] }>) => void;
+  clearPageEmbeddings: () => void;
+  setIsIndexingEmbeddings: (isIndexing: boolean) => void;
 
   setCurrentTool: (tool: string) => void;
   setIsSidebarOpen: (isOpen: boolean) => void;
   setIsToolbarCollapsed: (isCollapsed: boolean) => void;
   setSidebarTab: (tab: 'thumbnails' | 'annotations' | 'search') => void;
   setIsDarkMode: (isDark: boolean) => void;
+  setIsReaderMode: (value: boolean) => void;
+  setReaderEntryPage: (page: number) => void;
   setIsLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
+  setIsLibraryPickerOpen: (value: boolean) => void;
+  setIsSettingsDialogOpen: (value: boolean) => void;
 
   reset: () => void;
 }
@@ -115,19 +133,38 @@ const initialState = {
   currentSearchResultIndex: 0,
   ocrResults: new Map(),
   isProcessingOCR: false,
+  pageEmbeddings: new Map(),
+  isIndexingEmbeddings: false,
   currentTool: 'select',
   isSidebarOpen: true,
   isToolbarCollapsed: false,
   sidebarTab: 'thumbnails' as const,
   isDarkMode: false,
+  isReaderMode: false,
+  readerEntryPage: 1,
   isLoading: false,
   error: null,
+  isLibraryPickerOpen: false,
+  isSettingsDialogOpen: false,
 };
 
 export const usePDFStore = create<PDFState>((set, get) => ({
   ...initialState,
 
-  setCurrentDocument: (doc) => set({ currentDocument: doc, totalPages: doc?.pageCount || 0 }),
+  setCurrentDocument: (doc) => {
+    const prevPath = get().currentDocument?.path;
+    const changingDoc = doc?.path !== prevPath;
+    set({
+      currentDocument: doc,
+      totalPages: doc?.pageCount || 0,
+      ...(changingDoc
+        ? {
+            pageEmbeddings: new Map<number, number[]>(),
+            ocrResults: new Map<number, OCRResult>(),
+          }
+        : {}),
+    });
+  },
   setCurrentPage: (page) => set({ currentPage: page }),
   setTotalPages: (pages) => set({ totalPages: pages }),
   setScale: (scale) => set({ scale }),
@@ -269,12 +306,36 @@ export const usePDFStore = create<PDFState>((set, get) => ({
     set({ ocrResults });
   },
 
+  hydrateOCRResults: (results) => {
+    const ocrResults = new Map<number, OCRResult>();
+    for (const r of results) ocrResults.set(r.pageNumber, r);
+    set({ ocrResults });
+  },
+
   setIsProcessingOCR: (isProcessing) => set({ isProcessingOCR: isProcessing }),
+
+  setPageEmbedding: (pageNumber, vector) => {
+    const pageEmbeddings = new Map(get().pageEmbeddings);
+    pageEmbeddings.set(pageNumber, vector);
+    set({ pageEmbeddings });
+  },
+
+  hydratePageEmbeddings: (entries) => {
+    const pageEmbeddings = new Map<number, number[]>();
+    for (const e of entries) pageEmbeddings.set(e.pageNumber, e.vector);
+    set({ pageEmbeddings });
+  },
+
+  clearPageEmbeddings: () => set({ pageEmbeddings: new Map() }),
+
+  setIsIndexingEmbeddings: (isIndexing) => set({ isIndexingEmbeddings: isIndexing }),
 
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   setIsToolbarCollapsed: (isCollapsed) => set({ isToolbarCollapsed: isCollapsed }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
+  setIsReaderMode: (value) => set({ isReaderMode: value }),
+  setReaderEntryPage: (page) => set({ readerEntryPage: page }),
   setIsDarkMode: (isDark) => {
     set({ isDarkMode: isDark });
     // Apply dark mode class to document
@@ -288,6 +349,8 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   },
   setIsLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
+  setIsLibraryPickerOpen: (value) => set({ isLibraryPickerOpen: value }),
+  setIsSettingsDialogOpen: (value) => set({ isSettingsDialogOpen: value }),
 
   reset: () => set(initialState),
 }));

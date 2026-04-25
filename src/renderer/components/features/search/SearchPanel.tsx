@@ -1,10 +1,63 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Search, SearchX } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw, Search, SearchX, Sparkles } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { EmptyState } from '@components/ui/empty-state';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
+import {
+  applySemanticThreshold,
+  rankPagesBySimilarity,
+  rebuildEmbeddingsForDocument,
+} from '@renderer/services/embeddings-indexer';
 import { cn } from '@renderer/lib/utils';
+import type { OCRResult, SearchResult } from '@renderer/types';
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function searchOCRResults(
+  query: string,
+  ocrResults: Map<number, OCRResult>,
+  skipPages: Set<number>
+): SearchResult[] {
+  if (!query.trim() || ocrResults.size === 0) return [];
+  const out: SearchResult[] = [];
+  const re = new RegExp(escapeRegExp(query), 'gi');
+
+  ocrResults.forEach((result, pageNumber) => {
+    if (skipPages.has(pageNumber)) return;
+    const text = result.text || '';
+    re.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text)) !== null) {
+      out.push({
+        pageNumber,
+        matchIndex: match.index,
+        text: snippetAround(text, match.index, query.length),
+        position: { x: 0, y: 0, width: 0, height: 0 },
+      } as SearchResult);
+    }
+  });
+
+  return out;
+}
+
+function snippetAround(source: string, at: number, matchLen: number): string {
+  const start = Math.max(0, at - 40);
+  const end = Math.min(source.length, at + matchLen + 40);
+  const prefix = start > 0 ? '…' : '';
+  const suffix = end < source.length ? '…' : '';
+  return prefix + source.slice(start, end).replace(/\s+/g, ' ') + suffix;
+}
+
+function buildSemanticSnippet(pageNumber: number, ocr: Map<number, OCRResult>): string {
+  const hit = ocr.get(pageNumber);
+  if (!hit) return '';
+  const text = (hit.text || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= 180) return text;
+  return text.slice(0, 180) + '…';
+}
 
 export function SearchPanel() {
   const {
@@ -12,6 +65,9 @@ export function SearchPanel() {
     searchQuery,
     searchResults,
     currentSearchResultIndex,
+    ocrResults,
+    pageEmbeddings,
+    isIndexingEmbeddings,
     setSearchQuery,
     setSearchResults,
     setCurrentSearchResultIndex,
@@ -19,38 +75,70 @@ export function SearchPanel() {
   } = usePDFStore();
   const [query, setQuery] = useState(searchQuery);
   const [isSearching, setIsSearching] = useState(false);
+  const [mode, setMode] = useState<'exact' | 'semantic'>('exact');
+  const [semanticSkipMessage, setSemanticSkipMessage] = useState<string | null>(null);
 
-  const handleSearch = async () => {
-    if (!query.trim() || !currentDocument) return;
-
-    setIsSearching(true);
-    setSearchQuery(query);
-
+  const runExactSearch = async () => {
+    const renderer = new PDFRenderer();
     try {
-      const renderer = new PDFRenderer();
-      const data = await window.electronAPI.readFile(currentDocument.path);
+      const data = await window.electronAPI.readFile(currentDocument!.path);
       const arrayBuffer =
         data instanceof ArrayBuffer
           ? data
           : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-
       await renderer.loadDocument(arrayBuffer);
 
-      const results = await renderer.searchText(query);
-      setSearchResults(results);
-      setCurrentSearchResultIndex(0);
+      const textResults = await renderer.searchText(query);
+      const pagesFromTextLayer = new Set<number>(textResults.map((r: any) => r.pageNumber));
+      const ocrHits = searchOCRResults(query, ocrResults, pagesFromTextLayer);
 
-      if (results.length > 0) {
-        setCurrentPage(results[0].pageNumber);
-      }
-
+      return [...textResults, ...ocrHits].sort(
+        (a, b) => a.pageNumber - b.pageNumber || a.matchIndex - b.matchIndex
+      );
+    } finally {
       await renderer.destroy();
+    }
+  };
+
+  const runSemanticSearch = async (): Promise<SearchResult[]> => {
+    setSemanticSkipMessage(null);
+    const queryVec = await window.electronAPI.embedText(query);
+    if (!queryVec || pageEmbeddings.size === 0) return [];
+    const ranked = rankPagesBySimilarity(queryVec, pageEmbeddings, 20);
+    const filtered = applySemanticThreshold(ranked, query.trim().length);
+    if (filtered.kind === 'skip') {
+      setSemanticSkipMessage(filtered.reason);
+      return [];
+    }
+    return filtered.items.map<SearchResult>((r) => {
+      const snippet = buildSemanticSnippet(r.pageNumber, ocrResults);
+      return {
+        pageNumber: r.pageNumber,
+        matchIndex: 0,
+        text: snippet || `Page ${r.pageNumber} (score ${r.score.toFixed(2)})`,
+        position: { x: 0, y: 0, width: 0, height: 0 },
+      } as SearchResult;
+    });
+  };
+
+  const handleSearch = async () => {
+    if (!query.trim() || !currentDocument) return;
+    setIsSearching(true);
+    setSearchQuery(query);
+
+    try {
+      const combined = mode === 'semantic' ? await runSemanticSearch() : await runExactSearch();
+      setSearchResults(combined);
+      setCurrentSearchResultIndex(0);
+      if (combined.length > 0) setCurrentPage(combined[0].pageNumber);
     } catch (error) {
       console.error('Search failed:', error);
     } finally {
       setIsSearching(false);
     }
   };
+
+  const semanticDisabled = pageEmbeddings.size === 0;
 
   const handleNextResult = () => {
     if (searchResults.length === 0) return;
@@ -75,6 +163,55 @@ export function SearchPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="panel-muted p-4">
+        <div className="mb-3 flex items-center gap-1 rounded-full bg-background/60 p-1 text-xs font-medium">
+          <button
+            type="button"
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1.5 transition',
+              mode === 'exact'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => { setMode('exact'); setSemanticSkipMessage(null); }}
+          >
+            <Search className="h-3.5 w-3.5" />
+            Exact
+          </button>
+          <button
+            type="button"
+            disabled={semanticDisabled}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1.5 transition disabled:cursor-not-allowed disabled:opacity-50',
+              mode === 'semantic'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => !semanticDisabled && setMode('semantic')}
+            title={semanticDisabled ? 'Indexing… semantic search will be available shortly' : undefined}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Semantic
+          </button>
+          <div className="ml-auto flex items-center gap-2 pr-1">
+            {isIndexingEmbeddings ? (
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Indexing…
+              </span>
+            ) : currentDocument ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => rebuildEmbeddingsForDocument(currentDocument.path)}
+                title="Re-index this document for semantic search"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Re-index
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 rounded-[1.1rem] border border-input bg-background/80 px-3">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
@@ -150,7 +287,7 @@ export function SearchPanel() {
               className={cn(
                 'panel-muted block w-full p-4 text-left',
                 index === currentSearchResultIndex &&
-                  'border-primary/60 bg-primary/5 shadow-[0_14px_32px_rgba(13,148,136,0.12)]'
+                  'border-foreground/40 bg-muted shadow-soft-1'
               )}
               onClick={() => {
                 setCurrentSearchResultIndex(index);
@@ -170,6 +307,10 @@ export function SearchPanel() {
               <p className="mt-3 line-clamp-3 text-sm leading-6 text-foreground">{result.text}</p>
             </button>
           ))}
+        </div>
+      ) : mode === 'semantic' && semanticSkipMessage ? (
+        <div className="panel-muted flex min-h-[120px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          {semanticSkipMessage}
         </div>
       ) : (
         <EmptyState

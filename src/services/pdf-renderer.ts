@@ -6,7 +6,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export class PDFRenderer {
   private pdfDocument: pdfjsLib.PDFDocumentProxy | null = null;
-  private renderTasks: Map<number, pdfjsLib.RenderTask> = new Map();
+  // Keyed by canvas to prevent concurrent renders on the same surface.
+  private renderTasks: Map<HTMLCanvasElement, pdfjsLib.RenderTask> = new Map();
 
   async loadDocument(data: ArrayBuffer): Promise<void> {
     try {
@@ -28,11 +29,12 @@ export class PDFRenderer {
     }
 
     try {
-      // Cancel any existing render task for this page
-      const existingTask = this.renderTasks.get(pageNumber);
+      const existingTask = this.renderTasks.get(canvas);
       if (existingTask) {
         existingTask.cancel();
-        this.renderTasks.delete(pageNumber);
+        // Await cancellation so the canvas is free before the next render starts.
+        try { await existingTask.promise; } catch (_) { /* RenderingCancelledException */ }
+        this.renderTasks.delete(canvas);
       }
 
       const page = await this.pdfDocument.getPage(pageNumber);
@@ -43,7 +45,6 @@ export class PDFRenderer {
         throw new Error('Failed to get canvas context');
       }
 
-      // Support high DPI displays
       const outputScale = window.devicePixelRatio || 1;
 
       canvas.width = Math.floor(viewport.width * outputScale);
@@ -53,17 +54,15 @@ export class PDFRenderer {
 
       const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
 
-      const renderContext = {
+      const renderTask = page.render({
         canvasContext: context,
         viewport,
         transform: transform as any,
-      };
-
-      const renderTask = page.render(renderContext);
-      this.renderTasks.set(pageNumber, renderTask);
+      });
+      this.renderTasks.set(canvas, renderTask);
 
       await renderTask.promise;
-      this.renderTasks.delete(pageNumber);
+      this.renderTasks.delete(canvas);
     } catch (error: any) {
       if (error.name === 'RenderingCancelledException') {
         console.log(`Rendering cancelled for page ${pageNumber}`);
@@ -151,7 +150,6 @@ export class PDFRenderer {
   }
 
   async destroy(): Promise<void> {
-    // Cancel all render tasks
     this.renderTasks.forEach((task) => task.cancel());
     this.renderTasks.clear();
 
