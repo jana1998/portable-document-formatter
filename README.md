@@ -251,31 +251,33 @@ portable-document-formatter/
 - [x] Annotation system with comments
 - [x] Text and image overlays
 - [x] Full-text search with highlighting
-- [x] OCR with Tesseract.js
 - [x] Selective page export
 - [x] Dark mode support
 - [x] Thumbnail navigation
-
-### ✅ Recently Added
 - [x] In-place text editing via mupdf structured-text extraction
-- [x] PaddleOCR pipeline running in an Electron `utilityProcess` (replaces Tesseract)
+- [x] PaddleOCR pipeline running in an Electron `utilityProcess`
 - [x] On-device semantic search using MiniLM embeddings + sidecar caching
-- [x] On-device LLM (SmolLM2) wired through streaming IPC
+- [x] On-device LLM (SmolLM2) via Hugging Face Transformers — streaming IPC
 - [x] Mobile Companion — LAN HTTP server + QR pairing, edit & save from phone
+- [x] Welcome screen with drag-and-drop onboarding (`WelcomeHero`)
+- [x] Mobile library file picker (`LibraryPicker`)
+- [x] Distraction-free Reader Mode (`ReaderMode`)
+- [x] Settings dialog with companion toggle + QR display (`SettingsDialog`)
+- [x] Context-aware floating toolbar (`FloatingToolbar`)
 
 ### 🚧 In Progress
-- [ ] Page management (reorder, delete, rotate)
+- [ ] Page management — reorder, delete, rotate (UI scaffolded, not yet wired)
 - [ ] Export to images (PNG/JPEG)
 - [ ] Enhanced annotation tools (shapes, arrows)
 - [ ] Companion v1.5: HTTPS via self-signed cert (unlocks iOS clipboard write)
 - [ ] Companion v2: WebSocket transport for streaming OCR/LLM on mobile
 
 ### 🔮 Future Plans
-- [ ] Cloud storage integration (Google Drive, Dropbox)
-- [ ] Real-time collaboration
+- [ ] PDF merge/split
 - [ ] Form filling capabilities
 - [ ] Digital signatures
-- [ ] PDF merge/split
+- [ ] Cloud storage integration (Google Drive, Dropbox)
+- [ ] Real-time collaboration
 - [ ] Batch processing
 - [ ] Plugin system
 - [ ] Linux builds
