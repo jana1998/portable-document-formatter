@@ -13,6 +13,7 @@ import { ReaderMode } from '@components/features/reader/ReaderMode';
 import { SettingsDialog } from '@components/features/settings/SettingsDialog';
 import { LibraryPicker } from '@components/features/library/LibraryPicker';
 import { usePDFStore } from '@renderer/store/usePDFStore';
+import { cn } from '@renderer/lib/utils';
 
 function App() {
   const {

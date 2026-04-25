@@ -34,11 +34,12 @@
 - 🖼️ **Image Insertion** — Add images and graphics to your documents
 - 📊 **Non-Destructive Editing** — Original PDFs remain untouched until you save
 
-### 🔎 **Smart Search & OCR**
+### 🔎 **Smart Search & Extraction**
 - 🔍 **Full-Text Search** — Find any text across your entire document
 - 📍 **Result Highlighting** — Visual highlights for all search matches
-- 🤖 **OCR Processing** — Extract text from scanned PDFs and images using Tesseract.js
-- 📄 **Batch OCR** — Process single pages or entire documents at once
+- 🤖 **Multi-Format Extraction** — Extract structured Markdown from PDF, Office docs, and images
+- 🚀 **High-Performance Backend** — Powered by Microsoft MarkItDown via FastAPI microservice
+- 💾 **Result Caching** — Near-instant access to previously processed documents via IndexedDB
 
 ### 💾 **Flexible Export Options**
 - 📑 **Selective Export** — Save specific page ranges (e.g., "1-3, 5, 7-9")
@@ -127,11 +128,12 @@ npm run build
 2. Type your search query
 3. Navigate through results with keyboard shortcuts or the sidebar
 
-### 🤖 Using OCR
-1. Open a scanned PDF or image-based document
-2. Click the **OCR button**
-3. Choose between **current page** or **all pages**
-4. Wait for processing and copy the extracted text
+### 🤖 Document Extraction (OCR & Multi-Format)
+1. Open any document or image (.pdf, .docx, .pptx, .xlsx, .png, .jpg)
+2. Click the **Extraction** button in the toolbar
+3. The system will automatically detect the format and select the best extraction strategy
+4. Preview the structured Markdown results and copy/export as needed
+5. Frequent documents are cached for near-instant access!
 
 ### 💾 Saving Your Work
 1. Click the **save button** in the toolbar
@@ -264,7 +266,6 @@ portable-document-formatter/
 ### 🚧 In Progress
 - [ ] Page management (reorder, delete, rotate)
 - [ ] Export to images (PNG/JPEG)
-- [ ] Batch text extraction
 - [ ] Enhanced annotation tools (shapes, arrows)
 - [ ] Companion v1.5: HTTPS via self-signed cert (unlocks iOS clipboard write)
 - [ ] Companion v2: WebSocket transport for streaming OCR/LLM on mobile
