@@ -49,6 +49,7 @@ interface PDFState {
   // UI state
   currentTool: string;
   isSidebarOpen: boolean;
+  isToolbarCollapsed: boolean;
   sidebarTab: 'thumbnails' | 'annotations' | 'search';
   isDarkMode: boolean;
   isReaderMode: boolean;
@@ -100,6 +101,7 @@ interface PDFState {
 
   setCurrentTool: (tool: string) => void;
   setIsSidebarOpen: (isOpen: boolean) => void;
+  setIsToolbarCollapsed: (isCollapsed: boolean) => void;
   setSidebarTab: (tab: 'thumbnails' | 'annotations' | 'search') => void;
   setIsDarkMode: (isDark: boolean) => void;
   setIsReaderMode: (value: boolean) => void;
@@ -135,6 +137,7 @@ const initialState = {
   isIndexingEmbeddings: false,
   currentTool: 'select',
   isSidebarOpen: true,
+  isToolbarCollapsed: false,
   sidebarTab: 'thumbnails' as const,
   isDarkMode: false,
   isReaderMode: false,
@@ -329,6 +332,7 @@ export const usePDFStore = create<PDFState>((set, get) => ({
 
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  setIsToolbarCollapsed: (isCollapsed) => set({ isToolbarCollapsed: isCollapsed }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
   setIsReaderMode: (value) => set({ isReaderMode: value }),
   setReaderEntryPage: (page) => set({ readerEntryPage: page }),

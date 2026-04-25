@@ -260,12 +260,12 @@ textarea,
 [data-state],
 [data-radix-collection-item] {
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease,
-    opacity 180ms ease,
-    transform 180ms ease;
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
 }
 
 ::-webkit-scrollbar {

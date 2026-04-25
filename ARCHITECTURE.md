@@ -28,6 +28,12 @@ flowchart TB
         MainEntry[main.ts]
         FileService[file-service.ts]
         PDFService[pdf-service.ts]
+        MIDService[markitdown-service.ts]
+    end
+
+    subgraph Python["Python Microservice"]
+        FastAPI[FastAPI Server]
+        MarkItDown[MarkItDown Library]
     end
 
     App --> Toolbar
@@ -49,7 +55,43 @@ flowchart TB
     Preload --> MainEntry
     MainEntry --> FileService
     MainEntry --> PDFService
+    MainEntry --> MIDService
+    MIDService -- "IPC/HTTP" --> FastAPI
+    FastAPI --> MarkItDown
 ```
+
+## Phase 1 Architecture Evolution (In Progress)
+
+To support multi-format document processing and decouple OCR from the renderer, the architecture is evolving towards a microservice-based model.
+
+### Microservice Integration
+
+A Python-based FastAPI microservice wrapping **Microsoft MarkItDown** is being integrated. This service is managed as a subprocess by the Electron Main process.
+
+```mermaid
+graph LR
+    subgraph "Electron Main"
+        MSM[MarkItDownService]
+    end
+    
+    subgraph "External Process"
+        FAP[FastAPI Microservice]
+        MID[MarkItDown Library]
+    end
+    
+    MSM -- "Spawn/Monitor" --> FAP
+    MSM -- "HTTP/JSON" --> FAP
+    FAP -- "Process" --> MID
+```
+
+### Strategy Pattern for Document Processing
+
+A new abstraction layer is being implemented to allow pluggable document processors.
+
+- `DocumentProcessor`: Interface defining `process(file: string): Promise<string>`.
+- `MarkItDownProcessor`: Primary processor using the microservice.
+- `TesseractProcessor`: Fallback processor for local PDF/Image OCR.
+- `DocumentProcessorManager`: Orchestrates processor selection and fallback logic.
 
 ## Key Responsibilities
 
@@ -134,7 +176,7 @@ classDiagram
     PDFDocument --> OCRResult
 ```
 
-State is stored primarily as page-keyed `Map<number, T[]>` collections in [src/renderer/store/usePDFStore.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/renderer/store/usePDFStore.ts), which keeps overlays and OCR results aligned to the active page without introducing separate caches per component.
+State is stored primarily as page-keyed `Map<number, T[]>` collections in [src/renderer/store/usePDFStore.ts](src/renderer/store/usePDFStore.ts), which keeps overlays and OCR results aligned to the active page without introducing separate caches per component.
 
 ## Document Lifecycle
 
@@ -212,24 +254,33 @@ sequenceDiagram
 
 This is why the current docs should describe save as an export step, not a simple file copy.
 
-## Search And OCR
+## Search And Extraction (Phase 1)
 
 ```mermaid
 flowchart LR
-    Query[Search query or OCR request] --> RendererRead[Renderer reads active PDF]
+    Query[Search query] --> RendererRead[Renderer reads active PDF]
     RendererRead --> PDFJS[pdf.js renderer]
     PDFJS --> SearchResults[Search results with positions]
     SearchResults --> SearchLayer[SearchHighlightLayer]
 
-    RendererRead --> OCRMode{OCR mode}
-    OCRMode -->|Current page| VisibleCanvas[Use visible canvas]
-    OCRMode -->|All pages| Offscreen[Render pages off-screen]
-    VisibleCanvas --> Tesseract[tesseract.js]
-    Offscreen --> Tesseract
-    Tesseract --> OCRStore[Store OCR results]
+    Request[Extraction request] --> ProcessorManager[DocumentProcessorManager]
+    ProcessorManager --> Strategy{Strategy Selection}
+    Strategy -->|MarkItDown| MIDProcessor[MarkItDownProcessor]
+    Strategy -->|Tesseract| TessProcessor[TesseractProcessor]
+    
+    MIDProcessor --> Main[Electron Main]
+    Main --> MIDService[MarkItDownService]
+    MIDService --> FastAPI[FastAPI Microservice]
+    
+    TessProcessor --> TessJS[tesseract.js]
+    
+    FastAPI --> Results[Structured Markdown]
+    TessJS --> Results
+    Results --> Cache[IndexedDB Cache]
+    Results --> UI[OCRDialog Preview]
 ```
 
-Search is fully renderer-side and relies on `pdf-renderer.ts` text extraction from `pdfjs-dist`. OCR is also currently renderer-driven from `OCRDialog.tsx`; the separate `ocr-service.ts` and `src/workers/ocr-worker.ts` are placeholders rather than the active path.
+Search remains fully renderer-side and relies on `pdf-renderer.ts` text extraction from `pdfjs-dist`. Extraction (formerly OCR) is being migrated to a Strategy-based model. The `MarkItDownProcessor` is the primary engine, offloading heavy processing to a Python microservice via the `MarkItDownService` in the main process. `TesseractProcessor` remains as a fallback for local-only OCR of images or when the microservice is unavailable.
 
 ## UI Composition
 
@@ -277,8 +328,8 @@ The sidecar annotation save and the embedded PDF export are separate mechanisms.
 ## Boundaries And Known Gaps
 
 - `PageManagement.tsx` is not wired into the main workflow, so merge, split, delete, and extract should be treated as partial UI work rather than a polished feature surface.
-- `exportPageToImage()` and `extractText()` in [src/main/services/pdf-service.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/main/services/pdf-service.ts) intentionally throw and need additional dependencies before they can be documented as shipped features.
-- The PDF.js worker path is CDN-based in [src/services/pdf-renderer.ts](/Users/supravojana/Documents/GitHub/portable-document-formatter/src/services/pdf-renderer.ts), which is simple for development but not ideal for fully offline packaging.
+- `exportPageToImage()` and `extractText()` in [src/main/services/pdf-service.ts](src/main/services/pdf-service.ts) intentionally throw and need additional dependencies before they can be documented as shipped features.
+- The PDF.js worker path is CDN-based in [src/services/pdf-renderer.ts](src/services/pdf-renderer.ts), which is simple for development but not ideal for fully offline packaging.
 
 ## Testing Surface
 
