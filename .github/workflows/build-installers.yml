@@ -97,8 +97,8 @@ jobs:
       - name: Publish rolling prerelease
         uses: softprops/action-gh-release@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_PAT }}
+          GH_TOKEN: ${{ secrets.MY_PAT }}
         with:
           tag_name: main-build
           name: Latest Main Build
