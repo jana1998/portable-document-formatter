@@ -121,12 +121,12 @@
    * Layout primitives
    */
   .app-shell {
-    @apply relative flex h-full flex-col overflow-hidden bg-background p-4 sm:p-6;
+    @apply relative flex h-full flex-col overflow-hidden bg-background;
   }
 
   /* Floating nav pill: the signature Mastercard dock. */
   .toolbar-shell {
-    @apply relative z-10 flex flex-col gap-3 rounded-[2rem] border border-border/70 bg-white px-5 py-3 shadow-[0_4px_24px_rgba(20,20,19,0.04)] dark:bg-[hsl(60_3%_14%)] dark:border-white/5;
+    @apply relative z-10 flex flex-col gap-2 rounded-[2rem] border border-border/70 bg-white px-3 py-2 sm:px-4 sm:py-2 shadow-[0_4px_24px_rgba(20,20,19,0.04)] dark:bg-[hsl(60_3%_14%)] dark:border-white/5;
   }
 
   /* Lifted cream — the "paper on paper" surface for sidebar/panels. */
@@ -185,7 +185,7 @@
    * No gradient, no grid — soft cream paper treatment.
    */
   .viewer-stage {
-    @apply relative overflow-auto rounded-[2.5rem] border border-border/60 bg-card p-4 shadow-[0_24px_48px_rgba(20,20,19,0.06)] sm:p-8;
+    @apply relative overflow-auto rounded-[2.5rem] border border-border/60 bg-card p-2 shadow-[0_24px_48px_rgba(20,20,19,0.06)] sm:p-4;
   }
 
   .viewer-grid {
@@ -202,27 +202,6 @@
    */
   .landing-stage {
     @apply relative flex h-full min-h-[560px] items-center justify-center overflow-hidden rounded-[2.5rem] bg-card;
-  }
-
-  .landing-watermark {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    font-weight: 500;
-    letter-spacing: -0.03em;
-    color: hsl(30 13% 88%);
-    font-size: clamp(4rem, 10vw, 9rem);
-    line-height: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    user-select: none;
-  }
-
-  .dark .landing-watermark {
-    color: hsl(60 3% 16%);
   }
 
   .landing-content {

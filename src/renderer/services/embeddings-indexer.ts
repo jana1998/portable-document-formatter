@@ -132,3 +132,21 @@ export function rankPagesBySimilarity(
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, topK);
 }
+
+export type SemanticFilterResult =
+  | { kind: 'skip'; reason: string }
+  | { kind: 'results'; items: Array<{ pageNumber: number; score: number }> };
+
+export function applySemanticThreshold(
+  ranked: Array<{ pageNumber: number; score: number }>,
+  queryLength: number
+): SemanticFilterResult {
+  if (queryLength <= 2) {
+    return {
+      kind: 'skip',
+      reason: 'Semantic search works best with phrases — try exact search for single characters',
+    };
+  }
+  const threshold = queryLength <= 6 ? 0.15 : 0.25;
+  return { kind: 'results', items: ranked.filter((r) => r.score >= threshold) };
+}

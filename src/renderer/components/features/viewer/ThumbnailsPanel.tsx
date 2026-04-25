@@ -184,18 +184,8 @@ export function ThumbnailsPanel() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="panel-muted flex items-center justify-between px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Page navigator</p>
-          <p className="text-xs text-muted-foreground">
-            Drag & drop to reorder • {Math.min(totalPages, PREVIEW_LIMIT)} previews
-          </p>
-        </div>
-        <div className="meta-pill">{totalPages} total</div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-20">
         {isReordering && (
           <div className="panel-muted mb-3 flex items-center justify-center gap-2 p-3 text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -203,7 +193,7 @@ export function ThumbnailsPanel() {
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {pageOrder.map((pageNumber, index) => {
             const hasPreview = thumbnails.has(pageNumber);
             const previewUnavailable = pageNumber > PREVIEW_LIMIT;
@@ -221,7 +211,7 @@ export function ThumbnailsPanel() {
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, pageNumber)}
                 className={cn(
-                  'group panel-muted block w-full overflow-hidden p-2 text-left transition-all relative',
+                  'group panel-muted block w-full max-w-[200px] mx-auto overflow-hidden p-1.5 text-left transition-all relative',
                   currentPage === pageNumber && 'border-foreground bg-muted shadow-soft-1',
                   isDragging && 'opacity-50 scale-95',
                   isDropTarget && 'ring-2 ring-primary ring-offset-2',
@@ -264,16 +254,16 @@ export function ThumbnailsPanel() {
                     )}
                   </div>
 
-                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-background/90 px-3 py-2 text-xs">
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-background/90 px-2 py-1.5 text-[10px]">
                     <span className="font-semibold text-foreground">
-                      Page {pageNumber}
+                      {pageNumber}
                       {index + 1 !== pageNumber && (
-                        <span className="ml-1 text-muted-foreground">→ {index + 1}</span>
+                        <span className="ml-0.5 text-muted-foreground">→{index + 1}</span>
                       )}
                     </span>
                     {currentPage === pageNumber ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">
-                        Active
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+                        ✓
                       </span>
                     ) : null}
                   </div>

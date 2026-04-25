@@ -34,6 +34,8 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
   const [statusLine, setStatusLine] = useState('');
   const [result, setResult] = useState('');
   const [language] = useState<'multi'>('multi');
+  const [exportFormat, setExportFormat] = useState<'md' | 'txt' | 'pdf'>('md');
+  const [isExporting, setIsExporting] = useState(false);
   const abortRef = useRef(false);
   const { toast } = useToast();
 
@@ -173,9 +175,49 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
     }
   };
 
+  const handleExport = async () => {
+    if (!result || !currentDocument) return;
+    setIsExporting(true);
+    const baseName = currentDocument.name.replace(/\.pdf$/i, '');
+    try {
+      if (exportFormat === 'pdf') {
+        const savePath = await window.electronAPI.saveTextFile(
+          `${baseName}-ocr.pdf`,
+          [{ name: 'PDF Files', extensions: ['pdf'] }]
+        );
+        if (!savePath) return;
+        await window.electronAPI.exportOCRPDF(savePath, result);
+      } else {
+        const content =
+          exportFormat === 'md'
+            ? result.replace(/--- Page (\d+) ---/g, '\n## Page $1\n')
+            : result;
+        const filters =
+          exportFormat === 'md'
+            ? [{ name: 'Markdown', extensions: ['md'] }]
+            : [{ name: 'Plain Text', extensions: ['txt'] }];
+        const savePath = await window.electronAPI.saveTextFile(
+          `${baseName}-ocr.${exportFormat}`,
+          filters
+        );
+        if (!savePath) return;
+        await window.electronAPI.writeTextFile(savePath, content);
+      }
+      toast({ title: 'Export complete', variant: 'success' });
+    } catch (err) {
+      toast({
+        title: 'Export failed',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={isProcessing ? undefined : onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>OCR — Extract Text from PDF</DialogTitle>
           <DialogDescription>
@@ -271,6 +313,22 @@ export function OCRDialog({ open, onOpenChange }: OCRDialogProps) {
               >
                 Copy to Clipboard
               </Button>
+              <div className="flex items-center gap-2 pt-1">
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'md' | 'txt' | 'pdf')}
+                  disabled={isExporting}
+                  aria-label="Export format"
+                >
+                  <option value="md">Markdown (.md)</option>
+                  <option value="txt">Plain Text (.txt)</option>
+                  <option value="pdf">PDF (.pdf)</option>
+                </select>
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+                  {isExporting ? 'Exporting…' : 'Export text'}
+                </Button>
+              </div>
             </div>
           )}
 

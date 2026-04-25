@@ -29,10 +29,6 @@ vi.mock('@renderer/store/usePDFStore', () => ({
   }),
 }));
 
-vi.mock('@renderer/store/useSettingsStore', () => ({
-  useSettingsStore: () => ({ backend: 'anthropic', setBackend: vi.fn() }),
-}));
-
 describe('Toolbar', () => {
   it('should render toolbar buttons', () => {
     render(

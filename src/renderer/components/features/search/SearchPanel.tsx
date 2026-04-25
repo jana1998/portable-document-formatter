@@ -5,6 +5,7 @@ import { EmptyState } from '@components/ui/empty-state';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import {
+  applySemanticThreshold,
   rankPagesBySimilarity,
   rebuildEmbeddingsForDocument,
 } from '@renderer/services/embeddings-indexer';
@@ -75,6 +76,7 @@ export function SearchPanel() {
   const [query, setQuery] = useState(searchQuery);
   const [isSearching, setIsSearching] = useState(false);
   const [mode, setMode] = useState<'exact' | 'semantic'>('exact');
+  const [semanticSkipMessage, setSemanticSkipMessage] = useState<string | null>(null);
 
   const runExactSearch = async () => {
     const renderer = new PDFRenderer();
@@ -99,21 +101,24 @@ export function SearchPanel() {
   };
 
   const runSemanticSearch = async (): Promise<SearchResult[]> => {
+    setSemanticSkipMessage(null);
     const queryVec = await window.electronAPI.embedText(query);
     if (!queryVec || pageEmbeddings.size === 0) return [];
     const ranked = rankPagesBySimilarity(queryVec, pageEmbeddings, 20);
-    // Drop very weak matches — below ~0.25 cos on MiniLM rarely meaningful.
-    return ranked
-      .filter((r) => r.score >= 0.25)
-      .map<SearchResult>((r) => {
-        const snippet = buildSemanticSnippet(r.pageNumber, ocrResults);
-        return {
-          pageNumber: r.pageNumber,
-          matchIndex: 0,
-          text: snippet || `Page ${r.pageNumber} (score ${r.score.toFixed(2)})`,
-          position: { x: 0, y: 0, width: 0, height: 0 },
-        } as SearchResult;
-      });
+    const filtered = applySemanticThreshold(ranked, query.trim().length);
+    if (filtered.kind === 'skip') {
+      setSemanticSkipMessage(filtered.reason);
+      return [];
+    }
+    return filtered.items.map<SearchResult>((r) => {
+      const snippet = buildSemanticSnippet(r.pageNumber, ocrResults);
+      return {
+        pageNumber: r.pageNumber,
+        matchIndex: 0,
+        text: snippet || `Page ${r.pageNumber} (score ${r.score.toFixed(2)})`,
+        position: { x: 0, y: 0, width: 0, height: 0 },
+      } as SearchResult;
+    });
   };
 
   const handleSearch = async () => {
@@ -167,7 +172,7 @@ export function SearchPanel() {
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             )}
-            onClick={() => setMode('exact')}
+            onClick={() => { setMode('exact'); setSemanticSkipMessage(null); }}
           >
             <Search className="h-3.5 w-3.5" />
             Exact
@@ -302,6 +307,10 @@ export function SearchPanel() {
               <p className="mt-3 line-clamp-3 text-sm leading-6 text-foreground">{result.text}</p>
             </button>
           ))}
+        </div>
+      ) : mode === 'semantic' && semanticSkipMessage ? (
+        <div className="panel-muted flex min-h-[120px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          {semanticSkipMessage}
         </div>
       ) : (
         <EmptyState

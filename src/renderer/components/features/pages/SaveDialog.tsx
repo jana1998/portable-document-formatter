@@ -18,6 +18,7 @@ interface SaveDialogProps {
 
 export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
   const { currentDocument, totalPages, annotations, textElements, imageElements, textEdits } = usePDFStore();
+  const isCompanion = typeof window !== 'undefined' && window.electronAPI?.companionMode === true;
   const [saveOption, setSaveOption] = useState<'all' | 'specific'>('all');
   const [pageRanges, setPageRanges] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -29,17 +30,22 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
     setIsSaving(true);
 
     try {
-      const defaultPath = currentDocument.path.replace('.pdf', '_edited.pdf');
-      const savePath = await window.electronAPI.saveFile(defaultPath);
+      // Mobile companion: skip the native save dialog and let the server place
+      // the output in the library folder while the browser also downloads it.
+      const savePath = isCompanion
+        ? currentDocument.name.replace(/\.pdf$/i, '_edited.pdf')
+        : await window.electronAPI.saveFile(currentDocument.path.replace('.pdf', '_edited.pdf'));
 
       if (!savePath) {
         setIsSaving(false);
         return;
       }
 
+      // Mobile only saves the whole document; force 'all' regardless of state.
+      const effectiveOption = isCompanion ? 'all' : saveOption;
       let pagesToSave: number[] = [];
 
-      if (saveOption === 'all') {
+      if (effectiveOption === 'all') {
         pagesToSave = Array.from({ length: totalPages }, (_, i) => i + 1);
       } else {
         // Parse page ranges like "1-3, 5, 7-9"
@@ -69,7 +75,7 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
       };
 
       // If saving specific pages, first extract pages then apply modifications
-      if (saveOption === 'specific' && pagesToSave.length < totalPages) {
+      if (effectiveOption === 'specific' && pagesToSave.length < totalPages) {
         // Create a temporary file with extracted pages
         const tempPath = currentDocument.path.replace('.pdf', '_temp.pdf');
         await window.electronAPI.extractPages(currentDocument.path, pagesToSave, tempPath);
@@ -152,40 +158,42 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Save Options</label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="save-all"
-                  name="save-option"
-                  checked={saveOption === 'all'}
-                  onChange={() => setSaveOption('all')}
-                  className="h-4 w-4"
-                />
-                <label htmlFor="save-all" className="text-sm cursor-pointer">
-                  Save all pages ({totalPages} pages)
-                </label>
-              </div>
+          {!isCompanion && (
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Save Options</label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="save-all"
+                    name="save-option"
+                    checked={saveOption === 'all'}
+                    onChange={() => setSaveOption('all')}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor="save-all" className="text-sm cursor-pointer">
+                    Save all pages ({totalPages} pages)
+                  </label>
+                </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="save-specific"
-                  name="save-option"
-                  checked={saveOption === 'specific'}
-                  onChange={() => setSaveOption('specific')}
-                  className="h-4 w-4"
-                />
-                <label htmlFor="save-specific" className="text-sm cursor-pointer">
-                  Save specific pages
-                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="save-specific"
+                    name="save-option"
+                    checked={saveOption === 'specific'}
+                    onChange={() => setSaveOption('specific')}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor="save-specific" className="text-sm cursor-pointer">
+                    Save specific pages
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {saveOption === 'specific' && (
+          {!isCompanion && saveOption === 'specific' && (
             <div className="grid gap-2">
               <label htmlFor="page-ranges" className="text-sm font-medium">
                 Page Ranges

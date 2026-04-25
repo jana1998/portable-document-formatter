@@ -5,7 +5,9 @@ import { PDFService } from './services/pdf-service';
 import { FileService } from './services/file-service';
 import { OCRService } from './services/ocr-service';
 import { EmbeddingsService, type PageTextInput } from './services/embeddings-service';
-import { LLMService, type LLMBackend, type LLMGenerateOptions } from './services/llm-service';
+import { LLMService, type LLMGenerateOptions } from './services/llm-service';
+import { companionConfigStore } from './services/companion-config';
+import { companionServer } from './services/companion-server';
 
 let mainWindow: BrowserWindow | null = null;
 const pdfService = new PDFService();
@@ -52,9 +54,19 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow();
   setupIPCHandlers();
+
+  // Auto-start companion server if previously enabled.
+  try {
+    const config = await companionConfigStore.load();
+    if (config.enabled && config.libraryPath) {
+      await companionServer.start({ pdfService, fileService });
+    }
+  } catch (error) {
+    console.error('Companion auto-start failed:', error);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -213,6 +225,42 @@ function setupIPCHandlers() {
     return ocrService.loadSidecar(pdfPath);
   });
 
+  ipcMain.handle(
+    'dialog:saveTextFile',
+    async (_, defaultPath: string, filters: { name: string; extensions: string[] }[]) => {
+      const result = await dialog.showSaveDialog({ defaultPath, filters });
+      return result.canceled ? null : result.filePath;
+    }
+  );
+
+  ipcMain.handle('file:writeText', async (_, filePath: string, content: string) => {
+    await fs.writeFile(filePath, content, 'utf-8');
+  });
+
+  ipcMain.handle('ocr:exportPDF', async (_, outputPath: string, text: string) => {
+    const { PDFDocument: LibDoc, StandardFonts, rgb } = await import('pdf-lib');
+    const doc = await LibDoc.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 11;
+    const margin = 50;
+    const lineHeight = fontSize * 1.4;
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const lines = wrapText(text, font, fontSize, pageWidth - margin * 2);
+    let y = pageHeight - margin;
+    let page = doc.addPage([pageWidth, pageHeight]);
+    for (const line of lines) {
+      if (y < margin) {
+        page = doc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+      page.drawText(line, { x: margin, y, font, size: fontSize, color: rgb(0, 0, 0) });
+      y -= lineHeight;
+    }
+    const bytes = await doc.save();
+    await fs.writeFile(outputPath, bytes);
+  });
+
   // Embeddings (all-MiniLM-L6-v2 via @huggingface/transformers, utilityProcess)
   ipcMain.handle(
     'embeddings:embedDocument',
@@ -237,7 +285,7 @@ function setupIPCHandlers() {
     return embeddingsService.loadSidecar(pdfPath);
   });
 
-  // LLM (Anthropic / OpenAI cloud; local node-llama-cpp scaffolded for v1.1)
+  // LLM — on-device only (SmolLM2-360M via @huggingface/transformers in utilityProcess).
   ipcMain.handle('llm:generate', async (event, prompt: string, options: LLMGenerateOptions) => {
     return llmService.generate(event.sender, prompt, options ?? {});
   });
@@ -247,29 +295,92 @@ function setupIPCHandlers() {
     return true;
   });
 
-  ipcMain.handle('llm:hasApiKey', async (_, backend: 'anthropic' | 'openai') => {
-    return llmService.hasApiKey(backend);
+  // Mobile companion — desktop hosts an HTTP server so a phone on the same LAN
+  // can use the renderer remotely. v1 supports view + annotate + save.
+  ipcMain.handle('companion:status', async () => {
+    const config = await companionConfigStore.load();
+    const port = companionServer.getActivePort() ?? config.port;
+    return {
+      enabled: config.enabled,
+      running: companionServer.isRunning(),
+      port,
+      token: config.token,
+      libraryPath: config.libraryPath,
+      lanUrls: companionConfigStore.getLanUrls(port),
+    };
   });
 
-  ipcMain.handle(
-    'llm:setApiKey',
-    async (_, backend: 'anthropic' | 'openai', key: string | null) => {
-      await llmService.setApiKey(backend, key);
-      return true;
+  ipcMain.handle('companion:enable', async () => {
+    const config = await companionConfigStore.load();
+    if (!config.libraryPath) throw new Error('Library folder not selected');
+    if (!companionServer.isRunning()) {
+      await companionServer.start({ pdfService, fileService });
     }
-  );
+    await companionConfigStore.save({ enabled: true });
+    const port = companionServer.getActivePort()!;
+    return {
+      port,
+      token: config.token,
+      libraryPath: config.libraryPath,
+      lanUrls: companionConfigStore.getLanUrls(port),
+    };
+  });
 
-  ipcMain.handle('llm:testBackend', async (_, backend: 'anthropic' | 'openai') => {
-    return llmService.testBackend(backend);
+  ipcMain.handle('companion:disable', async () => {
+    await companionServer.stop();
+    await companionConfigStore.save({ enabled: false });
+    // Rotate token on disable so any leaked QR/token can't reattach later.
+    await companionConfigStore.rotateToken();
+    return true;
+  });
+
+  ipcMain.handle('companion:rotateToken', async () => {
+    const next = await companionConfigStore.rotateToken();
+    return { token: next.token };
+  });
+
+  ipcMain.handle('companion:pickLibrary', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose Companion library folder',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const libraryPath = result.filePaths[0];
+    await companionConfigStore.save({ libraryPath });
+    return libraryPath;
+  });
+
+  ipcMain.handle('companion:getLanUrls', async () => {
+    const config = await companionConfigStore.load();
+    const port = companionServer.getActivePort() ?? config.port;
+    return companionConfigStore.getLanUrls(port);
   });
 }
 
 app.on('before-quit', () => {
+  companionServer.stop().catch(() => undefined);
   ocrService.shutdown().catch(() => undefined);
   embeddingsService.shutdown().catch(() => undefined);
   llmService.cancelCurrent();
   llmService.shutdown().catch(() => undefined);
 });
 
-// TypeScript: LLMBackend is re-exported only for convenience elsewhere.
-export type { LLMBackend };
+function wrapText(text: string, font: { widthOfTextAtSize: (t: string, s: number) => number }, fontSize: number, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const rawLine of text.split('\n')) {
+    const words = rawLine.split(' ');
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? current + ' ' + word : word;
+      if (font.widthOfTextAtSize(candidate, fontSize) > maxWidth && current) {
+        out.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    out.push(current);
+  }
+  return out;
+}
+

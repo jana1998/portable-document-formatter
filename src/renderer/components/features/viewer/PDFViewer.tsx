@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Crosshair, Loader2, RotateCw, ZoomIn } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { PDFRenderer } from '@/services/pdf-renderer';
 import { AnnotationLayer } from '@components/features/annotations/AnnotationLayer';
@@ -10,14 +10,6 @@ import { TextBoxTool } from '@components/features/editing/TextBoxTool';
 import { ImageInsertTool } from '@components/features/editing/ImageInsertTool';
 
 const pdfRenderer = new PDFRenderer();
-
-const toolLabels: Record<string, string> = {
-  select: 'Selection mode',
-  'edit-text': 'Edit text mode',
-  highlight: 'Highlight mode',
-  text: 'Text mode',
-  image: 'Image placement',
-};
 
 export function PDFViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,35 +113,9 @@ export function PDFViewer() {
 
   return (
     <>
-      <section className="panel-surface flex h-full min-h-0 flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-              Canvas
-            </p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
-              {currentDocument?.name}
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="meta-pill">
-              <Crosshair className="h-3.5 w-3.5" />
-              {toolLabels[currentTool] ?? 'Selection mode'}
-            </div>
-            <div className="meta-pill">
-              <ZoomIn className="h-3.5 w-3.5" />
-              {Math.round(scale * 100)}%
-            </div>
-            <div className="meta-pill">
-              <RotateCw className="h-3.5 w-3.5" />
-              {rotation}deg
-            </div>
-          </div>
-        </div>
-
+      <section className="flex h-full min-h-0 flex-col overflow-hidden">
         <div
-          className="viewer-stage viewer-grid flex min-h-0 flex-1 items-start justify-center"
+          className="viewer-stage viewer-grid flex min-h-0 flex-1 items-start justify-center overflow-y-auto pb-20"
           onClick={handleCanvasClick}
           style={{ cursor: currentTool === 'edit-text' ? 'text' : currentTool !== 'select' ? 'crosshair' : 'default' }}
         >

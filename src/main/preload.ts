@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveOCRSidecar: (pdfPath: string, results: unknown) =>
     ipcRenderer.invoke('ocr:saveSidecar', pdfPath, results),
   loadOCRSidecar: (pdfPath: string) => ipcRenderer.invoke('ocr:loadSidecar', pdfPath),
+  saveTextFile: (defaultPath: string, filters: { name: string; extensions: string[] }[]) =>
+    ipcRenderer.invoke('dialog:saveTextFile', defaultPath, filters),
+  exportOCRPDF: (outputPath: string, text: string) =>
+    ipcRenderer.invoke('ocr:exportPDF', outputPath, text),
+  writeTextFile: (filePath: string, content: string) =>
+    ipcRenderer.invoke('file:writeText', filePath, content),
 
   // Embeddings (all-MiniLM-L6-v2, main-process utilityProcess)
   embedDocument: (
@@ -50,16 +56,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadEmbeddingsSidecar: (pdfPath: string) =>
     ipcRenderer.invoke('embeddings:loadSidecar', pdfPath),
 
-  // LLM — hybrid backend, streams chunks via on* subscriptions.
+  // LLM — local-only backend, streams chunks via on* subscriptions.
   llmGenerate: (prompt: string, options: unknown) =>
     ipcRenderer.invoke('llm:generate', prompt, options),
   llmCancel: () => ipcRenderer.invoke('llm:cancel'),
-  llmHasApiKey: (backend: 'anthropic' | 'openai') =>
-    ipcRenderer.invoke('llm:hasApiKey', backend),
-  llmSetApiKey: (backend: 'anthropic' | 'openai', key: string | null) =>
-    ipcRenderer.invoke('llm:setApiKey', backend, key),
-  llmTestBackend: (backend: 'anthropic' | 'openai') =>
-    ipcRenderer.invoke('llm:testBackend', backend),
   onLLMChunk: (cb: (payload: { requestId: string; chunk: string }) => void) => {
     const handler = (_: unknown, payload: { requestId: string; chunk: string }) => cb(payload);
     ipcRenderer.on('llm:chunk', handler);
@@ -75,6 +75,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('llm:error', handler);
     return () => ipcRenderer.removeListener('llm:error', handler);
   },
+
+  // Mobile companion — control the LAN HTTP server from settings.
+  companionStatus: () => ipcRenderer.invoke('companion:status'),
+  companionEnable: () => ipcRenderer.invoke('companion:enable'),
+  companionDisable: () => ipcRenderer.invoke('companion:disable'),
+  companionRotateToken: () => ipcRenderer.invoke('companion:rotateToken'),
+  companionPickLibrary: () => ipcRenderer.invoke('companion:pickLibrary'),
+  companionGetLanUrls: () => ipcRenderer.invoke('companion:getLanUrls'),
 });
 
 // Type definitions for TypeScript
@@ -83,8 +91,8 @@ declare global {
     electronAPI: {
       openFile: () => Promise<any>;
       saveFile: (defaultPath: string) => Promise<string | null>;
-      readFile: (filePath: string) => Promise<Buffer>;
-      writeFile: (filePath: string, data: Buffer) => Promise<void>;
+      readFile: (filePath: string) => Promise<Buffer | Uint8Array>;
+      writeFile: (filePath: string, data: Buffer | Uint8Array) => Promise<void>;
       getPDFInfo: (filePath: string) => Promise<any>;
       mergePDFs: (filePaths: string[], outputPath: string) => Promise<void>;
       splitPDF: (filePath: string, pageRanges: number[][], outputDir: string) => Promise<string[]>;
@@ -131,6 +139,12 @@ declare global {
           }>;
         }> | null
       >;
+      saveTextFile: (
+        defaultPath: string,
+        filters: { name: string; extensions: string[] }[]
+      ) => Promise<string | null>;
+      exportOCRPDF: (outputPath: string, text: string) => Promise<void>;
+      writeTextFile: (filePath: string, content: string) => Promise<void>;
       embedDocument: (
         pdfPath: string,
         pages: Array<{ pageNumber: number; text: string }>
@@ -143,7 +157,6 @@ declare global {
       llmGenerate: (
         prompt: string,
         options: {
-          backend?: 'local' | 'anthropic' | 'openai';
           model?: string;
           temperature?: number;
           maxTokens?: number;
@@ -151,11 +164,6 @@ declare global {
         }
       ) => Promise<{ requestId: string }>;
       llmCancel: () => Promise<boolean>;
-      llmHasApiKey: (backend: 'anthropic' | 'openai') => Promise<boolean>;
-      llmSetApiKey: (backend: 'anthropic' | 'openai', key: string | null) => Promise<boolean>;
-      llmTestBackend: (
-        backend: 'anthropic' | 'openai'
-      ) => Promise<{ ok: boolean; error?: string }>;
       onLLMChunk: (
         cb: (payload: { requestId: string; chunk: string }) => void
       ) => () => void;
@@ -163,6 +171,25 @@ declare global {
       onLLMError: (
         cb: (payload: { requestId: string; message: string }) => void
       ) => () => void;
+      companionStatus: () => Promise<{
+        enabled: boolean;
+        running: boolean;
+        port: number;
+        token: string;
+        libraryPath: string | null;
+        lanUrls: { iface: string; url: string }[];
+      }>;
+      companionEnable: () => Promise<{
+        port: number;
+        token: string;
+        libraryPath: string;
+        lanUrls: { iface: string; url: string }[];
+      }>;
+      companionDisable: () => Promise<boolean>;
+      companionRotateToken: () => Promise<{ token: string }>;
+      companionPickLibrary: () => Promise<string | null>;
+      companionGetLanUrls: () => Promise<{ iface: string; url: string }[]>;
+      companionMode?: boolean;
     };
   }
 }

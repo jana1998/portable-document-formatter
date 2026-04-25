@@ -2,7 +2,6 @@ import React from 'react';
 import { Files, MessageSquare, PanelLeftClose, Search } from 'lucide-react';
 import { Button } from '@components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs';
-import { PanelCard } from '@components/ui/panel-card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@components/ui/tooltip';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { ThumbnailsPanel } from '@components/features/viewer/ThumbnailsPanel';
@@ -12,28 +11,18 @@ import { cn } from '@renderer/lib/utils';
 
 type TabValue = 'thumbnails' | 'annotations' | 'search';
 
-const tabConfig: Array<{
-  value: TabValue;
-  label: string;
-  icon: typeof Files;
-}> = [
+const tabs: Array<{ value: TabValue; label: string; icon: typeof Files }> = [
   { value: 'thumbnails', label: 'Pages', icon: Files },
   { value: 'annotations', label: 'Notes', icon: MessageSquare },
   { value: 'search', label: 'Search', icon: Search },
 ];
 
 export function Sidebar() {
-  const {
-    sidebarTab,
-    setSidebarTab,
-    totalPages,
-    annotations,
-    searchResults,
-    setIsSidebarOpen,
-  } = usePDFStore();
+  const { sidebarTab, setSidebarTab, totalPages, annotations, searchResults, setIsSidebarOpen } =
+    usePDFStore();
 
   const annotationCount = Array.from(annotations.values()).reduce(
-    (total, pageAnnotations) => total + pageAnnotations.length,
+    (sum, a) => sum + a.length,
     0
   );
 
@@ -44,71 +33,71 @@ export function Sidebar() {
   };
 
   return (
-    <PanelCard className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden rounded-[2rem] border border-border/50 bg-card shadow-[0_8px_40px_rgba(20,20,19,0.07)]">
       <Tabs
         value={sidebarTab}
-        onValueChange={(value) => setSidebarTab(value as TabValue)}
+        onValueChange={(v) => setSidebarTab(v as TabValue)}
         className="flex h-full flex-col"
       >
-        <div className="flex items-center justify-between gap-2 px-5 pt-5">
-          <span className="eyebrow">Workspace</span>
+        {/* Header — top pt clears the fixed floating toolbar */}
+        <div className="flex shrink-0 items-center gap-2 px-3 pt-3 pb-3">
+          <TabsList className="h-8 flex-1 gap-0 rounded-full bg-muted/50 p-0.5">
+            {tabs.map(({ value, label, icon: Icon }) => {
+              const count = counts[value];
+              const active = sidebarTab === value;
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-medium"
+                >
+                  <Icon className="h-3 w-3 shrink-0" />
+                  <span className="hidden sm:inline">{label}</span>
+                  {count > 0 && (
+                    <span
+                      className={cn(
+                        'inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none',
+                        active
+                          ? 'bg-background/25 text-current'
+                          : 'bg-muted-foreground/15 text-muted-foreground'
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="toolbar"
+                variant="ghost"
                 size="icon"
-                className="shrink-0"
+                className="h-7 w-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
                 onClick={() => setIsSidebarOpen(false)}
                 aria-label="Collapse sidebar"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Hide sidebar</TooltipContent>
+            <TooltipContent side="right">Hide sidebar</TooltipContent>
           </Tooltip>
         </div>
 
-        <TabsList className="mx-5 mt-3 mb-4 grid h-auto grid-cols-3 gap-0.5">
-          {tabConfig.map(({ value, label, icon: Icon }) => {
-            const count = counts[value];
-            const active = sidebarTab === value;
-            return (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="flex items-center justify-center gap-2 py-2 text-[13px]"
-              >
-                <Icon className="h-[15px] w-[15px]" />
-                <span>{label}</span>
-                {count > 0 ? (
-                  <span
-                    className={cn(
-                      'inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums transition-colors',
-                      active
-                        ? 'bg-background/15 text-background'
-                        : 'bg-muted text-muted-foreground'
-                    )}
-                  >
-                    {count}
-                  </span>
-                ) : null}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+        <div className="mx-3 mb-0 border-t border-border/30" />
 
-        <div className="border-t border-border/60" />
-
-        <TabsContent value="thumbnails" className="min-h-0 flex-1 overflow-hidden p-5">
+        <TabsContent value="thumbnails" className="min-h-0 flex-1 overflow-hidden p-3">
           <ThumbnailsPanel />
         </TabsContent>
-        <TabsContent value="annotations" className="min-h-0 flex-1 overflow-hidden p-5">
+        <TabsContent value="annotations" className="min-h-0 flex-1 overflow-hidden p-3">
           <AnnotationsPanel />
         </TabsContent>
-        <TabsContent value="search" className="min-h-0 flex-1 overflow-hidden p-5">
+        <TabsContent value="search" className="min-h-0 flex-1 overflow-hidden p-3">
           <SearchPanel />
         </TabsContent>
       </Tabs>
-    </PanelCard>
+    </div>
   );
 }

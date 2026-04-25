@@ -51,8 +51,12 @@ interface PDFState {
   isSidebarOpen: boolean;
   sidebarTab: 'thumbnails' | 'annotations' | 'search';
   isDarkMode: boolean;
+  isReaderMode: boolean;
+  readerEntryPage: number;
   isLoading: boolean;
   error: string | null;
+  isLibraryPickerOpen: boolean;
+  isSettingsDialogOpen: boolean;
 
   // Actions
   setCurrentDocument: (doc: PDFDocument | null) => void;
@@ -98,8 +102,12 @@ interface PDFState {
   setIsSidebarOpen: (isOpen: boolean) => void;
   setSidebarTab: (tab: 'thumbnails' | 'annotations' | 'search') => void;
   setIsDarkMode: (isDark: boolean) => void;
+  setIsReaderMode: (value: boolean) => void;
+  setReaderEntryPage: (page: number) => void;
   setIsLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
+  setIsLibraryPickerOpen: (value: boolean) => void;
+  setIsSettingsDialogOpen: (value: boolean) => void;
 
   reset: () => void;
 }
@@ -129,14 +137,31 @@ const initialState = {
   isSidebarOpen: true,
   sidebarTab: 'thumbnails' as const,
   isDarkMode: false,
+  isReaderMode: false,
+  readerEntryPage: 1,
   isLoading: false,
   error: null,
+  isLibraryPickerOpen: false,
+  isSettingsDialogOpen: false,
 };
 
 export const usePDFStore = create<PDFState>((set, get) => ({
   ...initialState,
 
-  setCurrentDocument: (doc) => set({ currentDocument: doc, totalPages: doc?.pageCount || 0 }),
+  setCurrentDocument: (doc) => {
+    const prevPath = get().currentDocument?.path;
+    const changingDoc = doc?.path !== prevPath;
+    set({
+      currentDocument: doc,
+      totalPages: doc?.pageCount || 0,
+      ...(changingDoc
+        ? {
+            pageEmbeddings: new Map<number, number[]>(),
+            ocrResults: new Map<number, OCRResult>(),
+          }
+        : {}),
+    });
+  },
   setCurrentPage: (page) => set({ currentPage: page }),
   setTotalPages: (pages) => set({ totalPages: pages }),
   setScale: (scale) => set({ scale }),
@@ -305,6 +330,8 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   setSidebarTab: (tab) => set({ sidebarTab: tab }),
+  setIsReaderMode: (value) => set({ isReaderMode: value }),
+  setReaderEntryPage: (page) => set({ readerEntryPage: page }),
   setIsDarkMode: (isDark) => {
     set({ isDarkMode: isDark });
     // Apply dark mode class to document
@@ -318,6 +345,8 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   },
   setIsLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
+  setIsLibraryPickerOpen: (value) => set({ isLibraryPickerOpen: value }),
+  setIsSettingsDialogOpen: (value) => set({ isSettingsDialogOpen: value }),
 
   reset: () => set(initialState),
 }));
