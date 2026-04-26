@@ -8,7 +8,8 @@ import { TextEditLayer } from '@components/features/editing/TextEditLayer';
 import { SearchHighlightLayer } from '@components/features/search/SearchHighlightLayer';
 import { TextBoxTool } from '@components/features/editing/TextBoxTool';
 import { ImageInsertTool } from '@components/features/editing/ImageInsertTool';
-import type { TextEdit } from '@renderer/types';
+import { useToast } from '@renderer/hooks/use-toast';
+import type { TextEdit, BakedOutcome, BakedOutcomePath } from '@renderer/types';
 
 const pdfRenderer = new PDFRenderer();
 
@@ -41,6 +42,7 @@ export function PDFViewer() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const lastBakedSignature = useRef<string>('');
+  const { toast } = useToast();
   const {
     currentDocument,
     currentPage,
@@ -48,7 +50,10 @@ export function PDFViewer() {
     rotation,
     currentTool,
     textEdits,
+    editEngineMode,
     setBakedSnapshot,
+    setEditOutcomes,
+    accumulateSessionStats,
     setCurrentDocument,
     setIsLoading: setStoreLoading,
     setError,
@@ -90,14 +95,48 @@ export function PDFViewer() {
           ? sourceData
           : sourceData.buffer.slice(sourceData.byteOffset, sourceData.byteOffset + sourceData.byteLength);
 
-        const renderBytes: ArrayBuffer = flat.length === 0
-          ? sourceBytes
-          : await (async () => {
-              const baked = await window.electronAPI.bakeTextEdits(currentDocument.path, flat);
-              return baked instanceof ArrayBuffer
-                ? baked
-                : baked.buffer.slice(baked.byteOffset, baked.byteOffset + baked.byteLength);
-            })();
+        let renderBytes: ArrayBuffer;
+        if (flat.length === 0) {
+          renderBytes = sourceBytes;
+        } else {
+          const result = await window.electronAPI.bakeTextEdits(
+            currentDocument.path,
+            flat,
+            editEngineMode
+          );
+          const baked = result.bytes;
+          renderBytes = baked instanceof ArrayBuffer
+            ? baked
+            : baked.buffer.slice(baked.byteOffset, baked.byteOffset + baked.byteLength);
+
+          // Persist per-edit outcomes to the store.
+          const outcomeMap = new Map<string, BakedOutcome>();
+          for (const o of result.outcomes) {
+            outcomeMap.set(o.id, { path: o.path as BakedOutcomePath, reason: o.reason });
+          }
+          setEditOutcomes(outcomeMap);
+
+          // Accumulate session-level stats.
+          const delta = { surgeryCount: 0, legacyCount: 0, refusedCount: 0 };
+          for (const o of result.outcomes) {
+            if (o.path === 'tj-surgery') delta.surgeryCount++;
+            else if (o.path === 'legacy') delta.legacyCount++;
+            else delta.refusedCount++;
+          }
+          accumulateSessionStats(delta);
+
+          // Toast when any edit was refused due to missing glyph encoding.
+          const encodingMissing = result.outcomes.filter(
+            (o) => o.path === 'refused' && o.reason?.includes('encoding-missing')
+          );
+          if (encodingMissing.length > 0) {
+            toast({
+              title: 'Font encoding missing',
+              description: `${encodingMissing.length} edit${encodingMissing.length > 1 ? 's' : ''} could not be saved in-place — the font lacks character mappings for the new text.`,
+              variant: 'destructive',
+            });
+          }
+        }
 
         if (cancelled) return;
 

@@ -41,7 +41,7 @@ function pickCssFontStack(family: string, postScriptName: string): string {
 }
 
 export function TextEditLayer({ pageNumber, scale }: Props) {
-  const { currentDocument, currentTool, textEdits, bakedSnapshot, addTextEdit, updateTextEdit } = usePDFStore();
+  const { currentDocument, currentTool, textEdits, bakedSnapshot, editOutcomes, addTextEdit, updateTextEdit } = usePDFStore();
   const [lines, setLines] = useState<LineState[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState('');
@@ -190,6 +190,28 @@ export function TextEditLayer({ pageNumber, scale }: Props) {
           bakedSnapshot.get(line.id) === existingEdit!.newText;
         const showOverlayPaint = isEdited && !isBakedInSync;
 
+        // Color-code the bottom border by bake outcome so the user can see
+        // which path each edit took: green=byte-surgery, orange=legacy, red=refused.
+        const bakedOutcome = isBakedInSync ? editOutcomes.get(line.id) : undefined;
+        const outcomeBorderColor =
+          bakedOutcome?.path === 'tj-surgery' ? '#22c55e'
+          : bakedOutcome?.path === 'legacy' ? '#f97316'
+          : bakedOutcome?.path === 'refused' ? '#ef4444'
+          : '#94a3b8';
+        const outcomeBorderStyle = isBakedInSync
+          ? `2px solid ${outcomeBorderColor}`
+          : showOverlayPaint
+            ? '2px solid #3b82f6'
+            : 'none';
+
+        const outcomeTitle = bakedOutcome
+          ? bakedOutcome.path === 'tj-surgery'
+            ? `Saved (byte-surgery)${bakedOutcome.reason ? ` — ${bakedOutcome.reason}` : ''}`
+            : bakedOutcome.path === 'legacy'
+              ? 'Saved (legacy redraw)'
+              : `Not saved in-place${bakedOutcome.reason ? ` — ${bakedOutcome.reason}` : ''}`
+          : undefined;
+
         const left = bbox.x * scale;
         const top = bbox.y * scale;
         const minWidth = Math.max(bbox.w * scale, 20);
@@ -265,9 +287,11 @@ export function TextEditLayer({ pageNumber, scale }: Props) {
                 onClick={() => handleLineClick(line)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLineClick(line)}
                 title={
-                  isEdited
-                    ? `Edited: "${existingEdit?.newText}"`
-                    : `Click to edit: "${line.info.text}"`
+                  outcomeTitle
+                    ? `Edited: "${existingEdit?.newText}" — ${outcomeTitle}`
+                    : isEdited
+                      ? `Edited: "${existingEdit?.newText}"`
+                      : `Click to edit: "${line.info.text}"`
                 }
                 className={
                   showOverlayPaint
@@ -284,7 +308,7 @@ export function TextEditLayer({ pageNumber, scale }: Props) {
                   // font and color.
                   backgroundColor: showOverlayPaint ? 'white' : 'transparent',
                   color: showOverlayPaint ? textColor : 'transparent',
-                  borderBottom: showOverlayPaint ? '2px solid #3b82f6' : 'none',
+                  borderBottom: outcomeBorderStyle,
                   boxShadow: showOverlayPaint ? '0 0 0 1.5px white' : 'none',
                   userSelect: 'none',
                   whiteSpace: 'nowrap',

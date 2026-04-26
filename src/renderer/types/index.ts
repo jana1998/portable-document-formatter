@@ -150,6 +150,15 @@ export type TextEditLineInfo = {
   color: string; // #rrggbb
 };
 
+export type BakedOutcomePath = 'tj-surgery' | 'legacy' | 'refused';
+
+export interface BakedOutcome {
+  path: BakedOutcomePath;
+  reason?: string;
+}
+
+export type EditEngineMode = 'auto' | 'strict' | 'legacy-only';
+
 export interface ExportOptions {
   format: 'pdf' | 'png' | 'jpeg' | 'txt';
   pages?: number[];

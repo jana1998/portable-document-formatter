@@ -10,6 +10,8 @@ import {
 } from '@components/ui/dialog';
 import { Button } from '@components/ui/button';
 import { useToast } from '@renderer/hooks/use-toast';
+import { usePDFStore } from '@renderer/store/usePDFStore';
+import type { EditEngineMode } from '@renderer/types';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -25,11 +27,18 @@ interface CompanionSnapshot {
   lanUrls: { iface: string; url: string }[];
 }
 
+const ENGINE_OPTIONS: { value: EditEngineMode; label: string; description: string }[] = [
+  { value: 'auto', label: 'Auto', description: 'Byte-surgery first, legacy redraw as fallback' },
+  { value: 'strict', label: 'Strict', description: 'Byte-surgery only — refuse edits that need fallback' },
+  { value: 'legacy-only', label: 'Legacy only', description: 'Always use redraw (slower, bypasses engine)' },
+];
+
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [status, setStatus] = useState<CompanionSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const { toast } = useToast();
+  const { editEngineMode, setEditEngineMode, sessionStats } = usePDFStore();
 
   const refresh = useCallback(async () => {
     try {
@@ -254,6 +263,48 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               No LAN address detected — check that you&apos;re connected to WiFi.
             </p>
           )}
+
+          <section className="grid gap-3 border-t border-border/60 pt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Text editing engine
+            </p>
+            <div className="flex rounded-md border border-border/60 bg-muted/30 p-0.5">
+              {ENGINE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setEditEngineMode(opt.value)}
+                  className={`flex-1 rounded px-3 py-1.5 text-xs transition-colors ${
+                    editEngineMode === opt.value
+                      ? 'bg-background font-medium text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  title={opt.description}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {ENGINE_OPTIONS.find((o) => o.value === editEngineMode)?.description}
+            </p>
+            {(sessionStats.surgeryCount + sessionStats.legacyCount + sessionStats.refusedCount) > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Edits this session:{' '}
+                {sessionStats.surgeryCount + sessionStats.legacyCount + sessionStats.refusedCount}
+                {' '}(
+                <span className="text-green-600 dark:text-green-400">{sessionStats.surgeryCount} byte-surgery</span>
+                {' / '}
+                <span className="text-orange-500 dark:text-orange-400">{sessionStats.legacyCount} legacy</span>
+                {sessionStats.refusedCount > 0 && (
+                  <>
+                    {' / '}
+                    <span className="text-red-500 dark:text-red-400">{sessionStats.refusedCount} refused</span>
+                  </>
+                )}
+                )
+              </p>
+            )}
+          </section>
         </div>
       </DialogContent>
     </Dialog>

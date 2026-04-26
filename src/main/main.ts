@@ -179,10 +179,10 @@ function setupIPCHandlers() {
     }
   });
 
-  ipcMain.handle('pdf:bakeTextEdits', async (_, filePath: string, textEdits: any[]) => {
-    const buf = await pdfService.bakeTextEdits(filePath, textEdits);
-    // ipcMain.handle serializes Buffers transparently; renderer receives Uint8Array.
-    return buf;
+  ipcMain.handle('pdf:bakeTextEdits', async (_, filePath: string, textEdits: any[], engineMode = 'auto') => {
+    const { bytes, outcomes } = await pdfService.bakeTextEdits(filePath, textEdits, engineMode as 'auto' | 'strict' | 'legacy-only');
+    // ipcMain.handle serializes Buffers transparently; renderer receives Uint8Array for bytes.
+    return { bytes, outcomes };
   });
 
   // Phase 4a read-only locator: map a structured-text line to the content

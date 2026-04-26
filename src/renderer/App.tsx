@@ -12,6 +12,7 @@ import { FloatingToolbar } from '@components/features/viewer/FloatingToolbar';
 import { ReaderMode } from '@components/features/reader/ReaderMode';
 import { SettingsDialog } from '@components/features/settings/SettingsDialog';
 import { LibraryPicker } from '@components/features/library/LibraryPicker';
+import { EditEngineDebugOverlay } from '@components/features/editing/EditEngineDebugOverlay';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { cn } from '@renderer/lib/utils';
 
@@ -219,6 +220,7 @@ function App() {
       {isReaderMode && <ReaderMode />}
       <SettingsDialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen} />
       <LibraryPicker open={isLibraryPickerOpen} onOpenChange={setIsLibraryPickerOpen} />
+      <EditEngineDebugOverlay />
     </TooltipProvider>
   );
 }

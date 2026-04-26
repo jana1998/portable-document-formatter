@@ -31,8 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Bake committed text edits into a temp PDF and return the modified bytes.
   // The renderer feeds these back into pdf.js so committed edits render natively
   // (matches the original PDF font/spacing) instead of relying on the overlay.
-  bakeTextEdits: (filePath: string, textEdits: unknown) =>
-    ipcRenderer.invoke('pdf:bakeTextEdits', filePath, textEdits),
+  bakeTextEdits: (filePath: string, textEdits: unknown, engineMode?: string) =>
+    ipcRenderer.invoke('pdf:bakeTextEdits', filePath, textEdits, engineMode ?? 'auto'),
 
   // Phase 4a — locate the content-stream operator(s) producing a given line.
   // Read-only diagnostic; used by TextEditLayer to log which Tj/TJ a click maps to.
@@ -115,7 +115,14 @@ declare global {
       }[]>;
       saveAnnotations: (filePath: string, annotations: any) => Promise<string>;
       loadAnnotations: (filePath: string) => Promise<any>;
-      bakeTextEdits: (filePath: string, textEdits: unknown) => Promise<Uint8Array>;
+      bakeTextEdits: (
+        filePath: string,
+        textEdits: unknown,
+        engineMode?: string
+      ) => Promise<{
+        bytes: Uint8Array;
+        outcomes: Array<{ id: string; path: string; reason?: string }>;
+      }>;
       locateTextEdit: (
         filePath: string,
         pageNumber: number,

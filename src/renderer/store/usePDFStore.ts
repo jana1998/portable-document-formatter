@@ -7,6 +7,8 @@ import type {
   SearchResult,
   OCRResult,
   TextEdit,
+  BakedOutcome,
+  EditEngineMode,
 } from '@renderer/types';
 
 interface PDFState {
@@ -36,6 +38,12 @@ interface PDFState {
   // (id → newText). When an entry matches the current edit's newText, the
   // overlay can hide its visible mask because pdf.js already shows the new text.
   bakedSnapshot: Map<string, string>;
+  // Per-edit outcome from the last bake (id → BakedOutcome).
+  editOutcomes: Map<string, BakedOutcome>;
+  // Which engine path to use when baking edits.
+  editEngineMode: EditEngineMode;
+  // Running counters for this session (not reset on document change).
+  sessionStats: { surgeryCount: number; legacyCount: number; refusedCount: number };
 
   // Search
   searchQuery: string;
@@ -86,6 +94,9 @@ interface PDFState {
   deleteTextEdit: (id: string) => void;
   setSelectedTextEditId: (id: string | null) => void;
   setBakedSnapshot: (snapshot: Map<string, string>) => void;
+  setEditOutcomes: (outcomes: Map<string, BakedOutcome>) => void;
+  setEditEngineMode: (mode: EditEngineMode) => void;
+  accumulateSessionStats: (delta: { surgeryCount?: number; legacyCount?: number; refusedCount?: number }) => void;
 
   setSearchQuery: (query: string) => void;
   setSearchResults: (results: SearchResult[]) => void;
@@ -110,6 +121,14 @@ interface PDFState {
   reset: () => void;
 }
 
+function readStoredEngineMode(): EditEngineMode {
+  try {
+    const s = localStorage.getItem('editEngineMode');
+    if (s === 'auto' || s === 'strict' || s === 'legacy-only') return s;
+  } catch {}
+  return 'auto';
+}
+
 const initialState = {
   currentDocument: null,
   currentPage: 1,
@@ -125,6 +144,9 @@ const initialState = {
   textEdits: new Map(),
   selectedTextEditId: null,
   bakedSnapshot: new Map(),
+  editOutcomes: new Map(),
+  editEngineMode: readStoredEngineMode(),
+  sessionStats: { surgeryCount: 0, legacyCount: 0, refusedCount: 0 },
   searchQuery: '',
   searchResults: [],
   currentSearchResultIndex: 0,
@@ -159,6 +181,7 @@ export const usePDFStore = create<PDFState>((set, get) => ({
             // force-reloaded.
             ocrResults: new Map<number, OCRResult>(),
             bakedSnapshot: new Map<string, string>(),
+            editOutcomes: new Map<string, BakedOutcome>(),
             textEdits: new Map<number, TextEdit[]>(),
             annotations: new Map<number, Annotation[]>(),
             textElements: new Map<number, TextElement[]>(),
@@ -306,6 +329,24 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   setSelectedTextEditId: (id) => set({ selectedTextEditId: id }),
 
   setBakedSnapshot: (snapshot) => set({ bakedSnapshot: snapshot }),
+
+  setEditOutcomes: (outcomes) => set({ editOutcomes: outcomes }),
+
+  setEditEngineMode: (mode) => {
+    set({ editEngineMode: mode });
+    try { localStorage.setItem('editEngineMode', mode); } catch {}
+  },
+
+  accumulateSessionStats: (delta) => {
+    const prev = get().sessionStats;
+    set({
+      sessionStats: {
+        surgeryCount: prev.surgeryCount + (delta.surgeryCount ?? 0),
+        legacyCount: prev.legacyCount + (delta.legacyCount ?? 0),
+        refusedCount: prev.refusedCount + (delta.refusedCount ?? 0),
+      },
+    });
+  },
 
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchResults: (results) => set({ searchResults: results }),

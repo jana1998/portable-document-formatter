@@ -33,6 +33,10 @@
 - 📝 **Text Overlays** — Insert custom text directly onto PDF pages
 - 🖼️ **Image Insertion** — Add images and graphics to your documents
 - 📊 **Non-Destructive Editing** — Original PDFs remain untouched until you save
+- ✍️ **In-place text editing** — Click any text in the document to edit it; the byte-surgery engine rewrites the original PDF content stream byte-for-byte, preserving the original font and spacing
+- 🔬 **Edit engine status** — Per-edit color-coded indicator: green = byte-surgery (vector-perfect), orange = legacy redraw, red = refused; tooltip shows the reason
+- ⚙️ **Engine mode toggle** — Switch between Auto / Strict / Legacy-only in Settings; persisted across sessions
+- 📊 **Session telemetry** — Settings dialog footer shows `N edits this session (M byte-surgery / K legacy / L refused)` for the current session
 
 ### 🔎 **Smart Search & Extraction**
 - 🔍 **Full-Text Search** — Find any text across your entire document
@@ -122,6 +126,14 @@ npm run build
 2. **Add Comments**: Click on any highlight to add or edit comments
 3. **Insert Text**: Choose the text tool and click anywhere on the page
 4. **Add Images**: Click the image tool, select an image, and place it
+
+### ✍️ Editing Text In-Place
+1. Click the **edit-text tool** (pencil icon) in the toolbar
+2. Hover over any text in the document — editable lines are highlighted
+3. Click a line to begin editing; press **Enter** or click away to commit
+4. Edits are baked into the rendered PDF automatically (debounced, ~250 ms after commit)
+5. The bottom border of each committed edit shows its engine path: **green** = byte-surgery (vector-perfect, original font preserved), **orange** = legacy redraw, **red** = refused (hover for reason)
+6. To change the engine mode (Auto / Strict / Legacy only), open **Settings** (gear icon)
 
 ### 🔍 Searching Documents
 1. Click the **search icon** in the toolbar
@@ -253,9 +265,7 @@ portable-document-formatter/
 - [x] Selective page export
 - [x] Dark mode support
 - [x] Thumbnail navigation
-- [x] In-place text editing via mupdf structured-text extraction
 - [x] PaddleOCR pipeline running in an Electron `utilityProcess`
-- [x] On-device LLM scaffold — streaming IPC wired, provider interface ready
 - [x] Mobile Companion — LAN HTTP server + QR pairing, edit & save from phone
 - [x] Welcome screen with drag-and-drop onboarding (`WelcomeHero`)
 - [x] Mobile library file picker (`LibraryPicker`)
@@ -263,7 +273,35 @@ portable-document-formatter/
 - [x] Settings dialog with companion toggle + QR display (`SettingsDialog`)
 - [x] Context-aware floating toolbar (`FloatingToolbar`)
 
+#### 📝 In-place text editing (Phase 4 — byte-surgery engine)
+- [x] **Phase 4a** — Tokenizer + Interpreter (ISO 32000 §7) for PDF content streams
+- [x] **Phase 4a** — Locator: maps mupdf line bbox → exact content-stream operator
+- [x] **Phase 4c** — Simple-font byte-surgery (Helvetica/Times/Courier with WinAnsi/MacRoman/Standard encodings + `/Differences` overrides)
+- [x] **Phase 4c** — Adobe Glyph List for glyph-name ↔ Unicode resolution
+- [x] **Phase 4d** — Type0 / Identity-H CID font support via `/ToUnicode` CMap parser (bfchar, bfrange, ligatures, surrogate pairs)
+- [x] **Phase 4d** — Hybrid pipeline: byte-surgery first, legacy redact-and-redraw fallback for residuals (per-edit partial success)
+- [x] Multi-run distribution for force-kerned headings and TJ arrays with kerning offsets (concat-into-first + same-length char-by-char)
+- [x] Whitespace-run partitioning so leading/trailing kerning slots don't shift typed text
+- [x] Cross-document state cleanup — switching PDFs no longer leaks edits between documents
+- [x] **Phase B** — Programmatic test fixture builders (5 builders) + visual-regression hash snapshots (mupdf pixmap → SHA-256)
+- [x] **Phase C — UI polish for the editing engine**
+  - Per-edit color-coded status badge: green = byte-surgery, orange = legacy redraw, red = refused; tooltip shows engine reason
+  - Missing-glyph warning toast (`refused-encoding-missing` outcome surfaces a destructive toast with edit count)
+  - Settings toggle: `Auto` / `Strict` / `Legacy only` engine mode, persisted to `localStorage`
+  - Session telemetry counter in Settings footer (byte-surgery / legacy / refused breakdown for the current session)
+  - `EditEngineDebugOverlay` — per-edit detail panel behind `?debug=editing` URL flag (path, reason, page, original/new text)
+  - `bakeTextEdits` IPC now returns `{ bytes, outcomes[] }` with per-edit `path` and `reason` fields; `engineMode` propagated end-to-end
+
 ### 🚧 In Progress
+
+#### 📝 Text-editing engine — remaining work
+
+- [ ] **Phase A — Missing-glyph handling** (tier choice pending — see [Tier 1/2/3](#text-editing-engine--phase-a-tier-choice) below)
+  - Detects when a typed character isn't in the PDF's embedded font subset
+  - Currently the engine returns `refused-encoding-missing`, fires a toast, and the legacy path takes over (rasterized, slightly different style)
+  - Real fix is multi-week font engineering; awaiting tier sign-off
+
+#### Other in-progress
 - [ ] Page management — reorder, delete, rotate (UI scaffolded, not yet wired)
 - [ ] Export to images (PNG/JPEG)
 - [ ] Enhanced annotation tools (shapes, arrows)
@@ -279,6 +317,20 @@ portable-document-formatter/
 - [ ] Batch processing
 - [ ] Plugin system
 - [ ] Linux builds
+
+---
+
+### Text-editing engine — Phase A tier choice
+
+The engine refuses an edit when the typed character isn't in the PDF's embedded font subset (e.g. typing `ñ` into a document whose subset only embedded ASCII glyphs). Three realistic implementation tiers, in increasing scope:
+
+| Tier | Scope | Effort | Risk |
+|---|---|---|---|
+| **1** | `SystemFontResolver` to look up `/BaseFont` in OS font dirs + missing-glyph detection. New outcome status `refused-glyph-not-in-subset`. The Phase C toast already fires on `refused-encoding-missing` — Tier 1 would give it a more precise message. **No font surgery.** | 1–2 days | Low |
+| **2** | Embed the system font as a **new** PDF font resource and switch to it via `Tf` in the content stream for the new text. Avoids modifying the existing subset. New text may visually diverge slightly (different hinting/metrics). | 1–2 weeks | Medium |
+| **3** | True in-place subset extension — modify embedded `glyf`/`loca`/`hmtx`/`cmap` (TrueType) or CharStrings INDEX (CFF), recompute checksums, update `/ToUnicode` and `/Widths`. No JS library does this — `fontkit` and `harfbuzz-subset` only subset (one-way). | Months | High |
+
+**Decision gate:** how often does the missing-glyph case actually hit on real-world PDFs? Recent test runs showed 8/8 byte-surgery success on the user's corpus, suggesting Tier 1 (warn clearly, never silently misrender) may be the right investment.
 
 ---
 

@@ -397,6 +397,7 @@ export class PDFService {
   async applyTextEditsToPDF(
     filePath: string,
     textEdits: {
+      id?: string;
       pageNumber: number;
       originalText: string;
       newText: string;
@@ -529,10 +530,29 @@ export class PDFService {
    */
   async bakeTextEdits(
     filePath: string,
-    textEdits: Parameters<PDFService['applyTextEditsToPDF']>[1]
-  ): Promise<Buffer> {
+    textEdits: Array<{
+      id: string;
+      pageNumber: number;
+      originalText: string;
+      newText: string;
+      mupdfX: number;
+      mupdfY: number;
+      mupdfW: number;
+      mupdfH: number;
+      fontSize: number;
+      fontName?: string;
+      fontFamily?: string;
+      fontWeight?: string;
+      fontStyle?: string;
+      color?: string;
+    }>,
+    engineMode: 'auto' | 'strict' | 'legacy-only' = 'auto'
+  ): Promise<{
+    bytes: Buffer;
+    outcomes: Array<{ id: string; path: 'tj-surgery' | 'legacy' | 'refused'; reason?: string }>;
+  }> {
     if (textEdits.length === 0) {
-      return fs.readFile(filePath);
+      return { bytes: await fs.readFile(filePath), outcomes: [] };
     }
 
     const log = (...args: unknown[]) => console.log('[bakeTextEdits]', ...args);
@@ -558,102 +578,126 @@ export class PDFService {
       }));
 
     if (editPairs.length === 0) {
-      return fs.readFile(filePath);
+      return { bytes: await fs.readFile(filePath), outcomes: [] };
     }
 
+    type OutcomeRecord = { id: string; path: 'tj-surgery' | 'legacy' | 'refused'; reason?: string };
+    const outcomeMap = new Map<string, OutcomeRecord>();
     let workingBytes: Buffer = await fs.readFile(filePath);
-    let appliedByteSurgery = 0;
     let needsLegacy: Edit[] = [];
 
     // ---------- byte-surgery pass ----------
-    try {
-      const result = await applyContentStreamEdits(
-        new Uint8Array(workingBytes),
-        editPairs.map((p) => p.request)
-      );
+    if (engineMode !== 'legacy-only') {
+      try {
+        const result = await applyContentStreamEdits(
+          new Uint8Array(workingBytes),
+          editPairs.map((p) => p.request)
+        );
 
-      // Pair each outcome with its source edit (same order).
-      result.outcomes.forEach((outcome, i) => {
-        if (outcome.status === 'tj-surgery') {
-          appliedByteSurgery++;
-        } else {
-          needsLegacy.push(editPairs[i].edit);
+        let appliedByteSurgery = 0;
+        result.outcomes.forEach((outcome, i) => {
+          const edit = editPairs[i].edit;
+          if (outcome.status === 'tj-surgery') {
+            appliedByteSurgery++;
+            outcomeMap.set(edit.id, {
+              id: edit.id,
+              path: 'tj-surgery',
+              reason: outcome.reason,
+            });
+          } else if (engineMode === 'strict') {
+            // strict mode: no legacy fallback — report as refused.
+            outcomeMap.set(edit.id, {
+              id: edit.id,
+              path: 'refused',
+              reason: outcome.reason
+                ? `${outcome.status}: ${outcome.reason}`
+                : outcome.status,
+            });
+          } else {
+            needsLegacy.push(edit);
+          }
+        });
+
+        if (appliedByteSurgery > 0 && result.modified) {
+          workingBytes = Buffer.from(result.outputBytes);
         }
-      });
 
-      if (appliedByteSurgery > 0 && result.modified) {
-        workingBytes = Buffer.from(result.outputBytes);
+        if (needsLegacy.length > 0) {
+          const summary = result.outcomes
+            .filter((o) => o.status !== 'tj-surgery')
+            .reduce<Record<string, number>>((acc, o) => {
+              acc[o.status] = (acc[o.status] ?? 0) + 1;
+              return acc;
+            }, {});
+          log(
+            `byte-surgery: ${appliedByteSurgery}/${editPairs.length} applied in-place; ${needsLegacy.length} need legacy fallback`,
+            summary
+          );
+          result.outcomes.forEach((o, i) => {
+            if (o.status !== 'tj-surgery') {
+              const target = editPairs[i].request.target.text;
+              const newText = editPairs[i].request.newText;
+              log(
+                `  · edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.status}` +
+                  (o.reason ? ` (${o.reason})` : '') +
+                  (o.confidence !== undefined ? ` [confidence=${o.confidence.toFixed(2)}]` : '')
+              );
+            }
+          });
+        } else {
+          log(
+            `byte-surgery: applied ${appliedByteSurgery}/${editPairs.length} edits in-place; original Tj operands replaced byte-for-byte`
+          );
+          result.outcomes.forEach((o, i) => {
+            if (o.status === 'tj-surgery' && o.reason) {
+              const target = editPairs[i].request.target.text;
+              const newText = editPairs[i].request.newText;
+              log(
+                `  ✓ edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.reason}`
+              );
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[bakeTextEdits] content-stream pipeline threw — routing all edits to legacy fallback:', err);
+        needsLegacy = editPairs.map((p) => p.edit);
       }
-
-      if (needsLegacy.length > 0) {
-        const summary = result.outcomes
-          .filter((o) => o.status !== 'tj-surgery')
-          .reduce<Record<string, number>>((acc, o) => {
-            acc[o.status] = (acc[o.status] ?? 0) + 1;
-            return acc;
-          }, {});
-        log(
-          `byte-surgery: ${appliedByteSurgery}/${editPairs.length} applied in-place; ${needsLegacy.length} need legacy fallback`,
-          summary
-        );
-        // Per-edit detail so we can see exactly what's blocking byte-surgery
-        // — the summary above only counts statuses; the reason string holds
-        // the actual diagnostic (missing chars, font name, confidence).
-        result.outcomes.forEach((o, i) => {
-          if (o.status !== 'tj-surgery') {
-            const target = editPairs[i].request.target.text;
-            const newText = editPairs[i].request.newText;
-            log(
-              `  · edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.status}` +
-                (o.reason ? ` (${o.reason})` : '') +
-                (o.confidence !== undefined ? ` [confidence=${o.confidence.toFixed(2)}]` : '')
-            );
-          }
-        });
-      } else {
-        log(
-          `byte-surgery: applied ${appliedByteSurgery}/${editPairs.length} edits in-place; original Tj operands replaced byte-for-byte`
-        );
-        // Verbose: when an edit had a non-trivial path (multi-run), surface
-        // the strategy + run breakdown so we can verify visual fidelity.
-        result.outcomes.forEach((o, i) => {
-          if (o.status === 'tj-surgery' && o.reason) {
-            const target = editPairs[i].request.target.text;
-            const newText = editPairs[i].request.newText;
-            log(
-              `  ✓ edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.reason}`
-            );
-          }
-        });
-      }
-    } catch (err) {
-      console.warn('[bakeTextEdits] content-stream pipeline threw — routing all edits to legacy fallback:', err);
+    } else {
+      // legacy-only mode: bypass byte-surgery for all edits.
       needsLegacy = editPairs.map((p) => p.edit);
     }
 
     // ---------- legacy fallback for the residual edits ----------
-    if (needsLegacy.length === 0) {
-      return workingBytes;
+    if (needsLegacy.length > 0) {
+      // Write current bytes to a temp file so applyTextEditsToPDF can read them.
+      const inputTmp = path.join(
+        os.tmpdir(),
+        `pdf-textedit-bake-in-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
+      );
+      const outputTmp = path.join(
+        os.tmpdir(),
+        `pdf-textedit-bake-out-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
+      );
+      try {
+        await fs.writeFile(inputTmp, workingBytes);
+        await this.applyTextEditsToPDF(inputTmp, needsLegacy, outputTmp);
+        workingBytes = await fs.readFile(outputTmp);
+        // Mark all legacy-path edits as 'legacy'.
+        for (const edit of needsLegacy) {
+          outcomeMap.set(edit.id, { id: edit.id, path: 'legacy' });
+        }
+      } finally {
+        await fs.unlink(inputTmp).catch(() => undefined);
+        await fs.unlink(outputTmp).catch(() => undefined);
+      }
     }
 
-    // Write current bytes to a temp file so applyTextEditsToPDF can read them.
-    // We keep the tmp file around only long enough to round-trip through pdf-lib.
-    const inputTmp = path.join(
-      os.tmpdir(),
-      `pdf-textedit-bake-in-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
-    );
-    const outputTmp = path.join(
-      os.tmpdir(),
-      `pdf-textedit-bake-out-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
-    );
-    try {
-      await fs.writeFile(inputTmp, workingBytes);
-      await this.applyTextEditsToPDF(inputTmp, needsLegacy, outputTmp);
-      return await fs.readFile(outputTmp);
-    } finally {
-      await fs.unlink(inputTmp).catch(() => undefined);
-      await fs.unlink(outputTmp).catch(() => undefined);
-    }
+    return {
+      bytes: workingBytes,
+      outcomes: editPairs.map(
+        (p) => outcomeMap.get(p.edit.id) ?? { id: p.edit.id, path: 'refused', reason: 'no-outcome' }
+      ),
+    };
   }
 
   async exportPageToImage(_filePath: string, _pageNumber: number, _format: string, _dpi: number): Promise<string> {
@@ -686,7 +730,7 @@ export class PDFService {
       let sourceFilePath = filePath;
       if (modifications.textEdits && modifications.textEdits.length > 0) {
         const tmpPath = path.join(os.tmpdir(), `pdf-textedit-${Date.now()}.pdf`);
-        const bakedBytes = await this.bakeTextEdits(filePath, modifications.textEdits);
+        const { bytes: bakedBytes } = await this.bakeTextEdits(filePath, modifications.textEdits);
         await fs.writeFile(tmpPath, bakedBytes);
         sourceFilePath = tmpPath;
       }
