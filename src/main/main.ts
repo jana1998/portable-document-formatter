@@ -4,16 +4,15 @@ import * as fs from 'fs/promises';
 import { PDFService } from './services/pdf-service';
 import { FileService } from './services/file-service';
 import { OCRService } from './services/ocr-service';
-import { EmbeddingsService, type PageTextInput } from './services/embeddings-service';
 import { LLMService, type LLMGenerateOptions } from './services/llm-service';
 import { companionConfigStore } from './services/companion-config';
 import { companionServer } from './services/companion-server';
+import { locateTextEdit } from './services/text-editing';
 
 let mainWindow: BrowserWindow | null = null;
 const pdfService = new PDFService();
 const fileService = new FileService();
 const ocrService = new OCRService();
-const embeddingsService = new EmbeddingsService();
 const llmService = new LLMService();
 
 function createWindow() {
@@ -180,6 +179,32 @@ function setupIPCHandlers() {
     }
   });
 
+  ipcMain.handle('pdf:bakeTextEdits', async (_, filePath: string, textEdits: any[]) => {
+    const buf = await pdfService.bakeTextEdits(filePath, textEdits);
+    // ipcMain.handle serializes Buffers transparently; renderer receives Uint8Array.
+    return buf;
+  });
+
+  // Phase 4a read-only locator: map a structured-text line to the content
+  // stream operator that produced it. Used by the renderer to log diagnostics
+  // before the editing engine ships in Phase 4b.
+  ipcMain.handle(
+    'pdf:locateTextEdit',
+    async (
+      _,
+      filePath: string,
+      pageNumber: number,
+      target: { bbox: { x: number; y: number; w: number; h: number }; text: string; fontSize?: number }
+    ) => {
+      try {
+        return await locateTextEdit(filePath, pageNumber, target);
+      } catch (err) {
+        console.warn('[locateTextEdit] failed:', err);
+        return null;
+      }
+    }
+  );
+
   ipcMain.handle('pdf:applyModifications', async (_, filePath: string, modifications: any, outputPath: string) => {
     try {
       await pdfService.applyModificationsToPDF(filePath, modifications, outputPath);
@@ -261,31 +286,7 @@ function setupIPCHandlers() {
     await fs.writeFile(outputPath, bytes);
   });
 
-  // Embeddings (all-MiniLM-L6-v2 via @huggingface/transformers, utilityProcess)
-  ipcMain.handle(
-    'embeddings:embedDocument',
-    async (_, _pdfPath: string, pages: PageTextInput[]) => {
-      return embeddingsService.embedDocument(pages);
-    }
-  );
-
-  ipcMain.handle('embeddings:embedText', async (_, text: string) => {
-    const [vec] = await embeddingsService.embedTexts([text]);
-    return vec ?? null;
-  });
-
-  ipcMain.handle(
-    'embeddings:saveSidecar',
-    async (_, pdfPath: string, embeddings: any[]) => {
-      return embeddingsService.saveSidecar(pdfPath, embeddings);
-    }
-  );
-
-  ipcMain.handle('embeddings:loadSidecar', async (_, pdfPath: string) => {
-    return embeddingsService.loadSidecar(pdfPath);
-  });
-
-  // LLM — on-device only (SmolLM2-360M via @huggingface/transformers in utilityProcess).
+  // LLM —
   ipcMain.handle('llm:generate', async (event, prompt: string, options: LLMGenerateOptions) => {
     return llmService.generate(event.sender, prompt, options ?? {});
   });
@@ -360,7 +361,6 @@ function setupIPCHandlers() {
 app.on('before-quit', () => {
   companionServer.stop().catch(() => undefined);
   ocrService.shutdown().catch(() => undefined);
-  embeddingsService.shutdown().catch(() => undefined);
   llmService.cancelCurrent();
   llmService.shutdown().catch(() => undefined);
 });

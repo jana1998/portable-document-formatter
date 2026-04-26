@@ -2,6 +2,10 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import {
+  applyTextEdits as applyContentStreamEdits,
+  type TextEditRequest,
+} from './text-editing/Renderer';
 
 // mupdf is an ESM-only package; load it lazily via dynamic import so that
 // Node.js CommonJS can consume it. TypeScript cannot statically resolve it
@@ -19,6 +23,91 @@ async function getMupdf(): Promise<any> {
     _mupdf = (mod.default ?? mod) as ReturnType<typeof getMupdf>;
   }
   return _mupdf;
+}
+
+/** Cut a string to N chars with an ellipsis, for log readability. */
+function truncate(s: string, n: number): string {
+  return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
+}
+
+/**
+ * Map a mupdf font (family + weight + style + PostScript name) to one of
+ * pdf-lib's 14 standard fonts so baked text resembles the surrounding PDF
+ * as closely as possible without extracting the embedded font itself.
+ *
+ * We check the PostScript name first because mupdf's `family` is sometimes
+ * just "serif" / "sans-serif", but the PostScript name (e.g.
+ * "TimesNewRomanPS-BoldMT") carries enough info to pick the right variant.
+ */
+function pickStandardFont(
+  family: string | undefined,
+  weight: string | undefined,
+  style: string | undefined,
+  postScriptName?: string
+): StandardFonts {
+  const familyLc = (family || '').toLowerCase();
+  const nameLc = (postScriptName || '').toLowerCase();
+
+  const isBold =
+    weight === 'bold' ||
+    weight === '700' ||
+    /bold|black|heavy/.test(nameLc) ||
+    (typeof weight === 'string' && /^[6789]\d{2}$/.test(weight));
+  const isItalic =
+    style === 'italic' ||
+    style === 'oblique' ||
+    /italic|oblique/.test(nameLc);
+
+  const isMono =
+    /(mono|courier|consolas|menlo|inconsolata)/.test(nameLc) ||
+    familyLc.includes('mono') ||
+    familyLc.includes('courier');
+  if (isMono) {
+    if (isBold && isItalic) return StandardFonts.CourierBoldOblique;
+    if (isBold) return StandardFonts.CourierBold;
+    if (isItalic) return StandardFonts.CourierOblique;
+    return StandardFonts.Courier;
+  }
+
+  const isSerif =
+    /(times|roman|georgia|garamond|palatino|cambria|caslon|baskerville|charter|minion)/.test(nameLc) ||
+    /(^|[^a-z])serif([^a-z]|$)/.test(familyLc);
+  const isExplicitSans =
+    /(helvetica|arial|verdana|tahoma|calibri|segoe|trebuchet|lato|roboto|ubuntu)/.test(nameLc) ||
+    familyLc.includes('sans');
+
+  if (isSerif && !isExplicitSans) {
+    if (isBold && isItalic) return StandardFonts.TimesRomanBoldItalic;
+    if (isBold) return StandardFonts.TimesRomanBold;
+    if (isItalic) return StandardFonts.TimesRomanItalic;
+    return StandardFonts.TimesRoman;
+  }
+
+  if (isBold && isItalic) return StandardFonts.HelveticaBoldOblique;
+  if (isBold) return StandardFonts.HelveticaBold;
+  if (isItalic) return StandardFonts.HelveticaOblique;
+  return StandardFonts.Helvetica;
+}
+
+/** Convert a mupdf color (number 0xRRGGBB or {r,g,b}) to pdf-lib rgb(). */
+function pickColor(raw: unknown): { r: number; g: number; b: number } {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return {
+      r: ((raw >> 16) & 0xff) / 255,
+      g: ((raw >> 8) & 0xff) / 255,
+      b: (raw & 0xff) / 255,
+    };
+  }
+  if (raw && typeof raw === 'object') {
+    const c = raw as { r?: number; g?: number; b?: number };
+    if (typeof c.r === 'number' && typeof c.g === 'number' && typeof c.b === 'number') {
+      // mupdf reports normalized [0,1] in some bindings, [0,255] in others.
+      const max = Math.max(c.r, c.g, c.b);
+      const div = max > 1 ? 255 : 1;
+      return { r: c.r / div, g: c.g / div, b: c.b / div };
+    }
+  }
+  return { r: 0, g: 0, b: 0 };
 }
 
 export class PDFService {
@@ -236,6 +325,7 @@ export class PDFService {
     text: string;
     bbox: { x: number; y: number; w: number; h: number };
     font: { name: string; family: string; weight: string; style: string; size: number };
+    color: string;
   }[]> {
     const mupdf = await getMupdf();
     const pdfBytes = await fs.readFile(filePath);
@@ -247,12 +337,34 @@ export class PDFService {
       text: string;
       bbox: { x: number; y: number; w: number; h: number };
       font: { name: string; family: string; weight: string; style: string; size: number };
+      color: string;
     }[] = [];
 
     for (const block of json.blocks ?? []) {
       if (block.type !== 'text') continue;
       for (const line of block.lines ?? []) {
         if (!line.text || line.text.trim() === '') continue;
+
+        // mupdf 1.27 puts color on chars (and sometimes spans) as 0xRRGGBB.
+        // Pick the first non-zero color we see in the line; fall back to black.
+        let rawColor: unknown = line.color;
+        if (rawColor === undefined || rawColor === 0) {
+          const span0 = (line.spans?.[0] ?? null) as { color?: unknown; chars?: Array<{ color?: unknown }> } | null;
+          if (span0) {
+            rawColor = span0.color ?? span0.chars?.[0]?.color;
+          }
+        }
+        if (rawColor === undefined || rawColor === 0) {
+          const char0 = (line.chars?.[0] ?? null) as { color?: unknown } | null;
+          if (char0) rawColor = char0.color;
+        }
+        const { r, g, b } = pickColor(rawColor);
+        const colorHex =
+          '#' +
+          [r, g, b]
+            .map((v) => Math.round(v * 255).toString(16).padStart(2, '0'))
+            .join('');
+
         lines.push({
           text: line.text,
           bbox: {
@@ -268,6 +380,7 @@ export class PDFService {
             style: line.font?.style ?? 'normal',
             size: line.font?.size ?? 12,
           },
+          color: colorHex,
         });
       }
     }
@@ -292,6 +405,11 @@ export class PDFService {
       mupdfW: number;
       mupdfH: number;
       fontSize: number;
+      fontName?: string;
+      fontFamily?: string;
+      fontWeight?: string;
+      fontStyle?: string;
+      color?: string; // #rrggbb
     }[],
     outputPath: string
   ): Promise<void> {
@@ -316,7 +434,18 @@ export class PDFService {
     }
     log(`pdf-lib loaded OK, pages: ${pdfDoc.getPageCount()}`);
 
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // Embed standard fonts on demand so the right family/weight/style is used
+    // per edit, instead of forcing every edit through Helvetica.
+    type AnyFont = Awaited<ReturnType<typeof pdfDoc.embedFont>>;
+    const fontCache = new Map<StandardFonts, AnyFont>();
+    const getFont = async (sf: StandardFonts): Promise<AnyFont> => {
+      let cached = fontCache.get(sf);
+      if (!cached) {
+        cached = await pdfDoc.embedFont(sf);
+        fontCache.set(sf, cached);
+      }
+      return cached;
+    };
 
     const editsByPage = new Map<number, typeof textEdits>();
     for (const edit of textEdits) {
@@ -342,22 +471,189 @@ export class PDFService {
         // pdf-lib drawText places text at the BASELINE, which is ~20% of fontSize
         // above the descender / bottom of the line bbox.
         const rectBottom = pageHeight - (edit.mupdfY + edit.mupdfH);
-        const textY = rectBottom + edit.fontSize * 0.2; // shift baseline up from rect bottom
+        const textY = rectBottom + edit.fontSize * 0.2;
         const w = edit.mupdfW;
         const h = edit.mupdfH;
 
-        log(`  "${edit.originalText}" → "${edit.newText}" x=${x.toFixed(1)} textY=${textY.toFixed(1)} size=${edit.fontSize}`);
+        const sf = pickStandardFont(edit.fontFamily, edit.fontWeight, edit.fontStyle, edit.fontName);
+        const font = await getFont(sf);
+
+        // Parse the original text color (#rrggbb), default to black.
+        let textColor = rgb(0, 0, 0);
+        if (typeof edit.color === 'string' && /^#[0-9a-f]{6}$/i.test(edit.color)) {
+          const r = parseInt(edit.color.slice(1, 3), 16) / 255;
+          const g = parseInt(edit.color.slice(3, 5), 16) / 255;
+          const b = parseInt(edit.color.slice(5, 7), 16) / 255;
+          textColor = rgb(r, g, b);
+        }
+
+        log(
+          `  "${edit.originalText}" → "${edit.newText}" x=${x.toFixed(1)} textY=${textY.toFixed(1)} size=${edit.fontSize} font=${sf} color=${edit.color ?? '#000000'}`
+        );
 
         // White rectangle with small margin to fully erase the original text
-        page.drawRectangle({ x: x - 1, y: rectBottom - 1, width: w + 6, height: h + 2, color: rgb(1, 1, 1), borderWidth: 0 });
-        // Draw replacement text at corrected baseline
-        page.drawText(edit.newText, { x, y: textY, size: edit.fontSize, font, color: rgb(0, 0, 0) });
+        page.drawRectangle({
+          x: x - 1,
+          y: rectBottom - 1,
+          width: w + 2,
+          height: h + 2,
+          color: rgb(1, 1, 1),
+          borderWidth: 0,
+        });
+        page.drawText(edit.newText, { x, y: textY, size: edit.fontSize, font, color: textColor });
       }
     }
 
     const outputBytes = await pdfDoc.save();
     await fs.writeFile(outputPath, outputBytes);
     log(`Done: ${outputBytes.length} bytes → ${outputPath}`);
+  }
+
+  /**
+   * Apply textEdits to filePath and return the modified PDF bytes.
+   *
+   * Strategy: try the content-stream byte-surgery pipeline first
+   * (`./text-editing/Renderer`). For each edit:
+   *   - byte-surgery success → applied to the output bytes in-place,
+   *     preserving font reference, color, and position byte-for-byte.
+   *   - byte-surgery failure → that one edit is later applied via the
+   *     legacy white-rect + standard-font draw path on top of the bytes
+   *     that the byte-surgery path already produced.
+   *
+   * This is *partial success*: the eligible edits keep their byte-perfect
+   * rendering even when some siblings need the fallback. (Earlier all-or-
+   * nothing logic forced the whole batch onto legacy.)
+   *
+   * Telemetry is logged per call so DevTools shows which edits took which
+   * path.
+   */
+  async bakeTextEdits(
+    filePath: string,
+    textEdits: Parameters<PDFService['applyTextEditsToPDF']>[1]
+  ): Promise<Buffer> {
+    if (textEdits.length === 0) {
+      return fs.readFile(filePath);
+    }
+
+    const log = (...args: unknown[]) => console.log('[bakeTextEdits]', ...args);
+
+    type Edit = (typeof textEdits)[number];
+
+    // Map renderer-side TextEdits → engine-side TextEditRequests, keeping
+    // the original-edit reference so we can route failures to the legacy
+    // path with the original (mupdf bbox + font name + color + …) data.
+    const editPairs: Array<{ edit: Edit; request: TextEditRequest }> = textEdits
+      .filter((e) => e.newText !== e.originalText)
+      .map((e) => ({
+        edit: e,
+        request: {
+          pageNumber: e.pageNumber,
+          target: {
+            bbox: { x: e.mupdfX, y: e.mupdfY, w: e.mupdfW, h: e.mupdfH },
+            text: e.originalText,
+            fontSize: e.fontSize,
+          },
+          newText: e.newText,
+        },
+      }));
+
+    if (editPairs.length === 0) {
+      return fs.readFile(filePath);
+    }
+
+    let workingBytes: Buffer = await fs.readFile(filePath);
+    let appliedByteSurgery = 0;
+    let needsLegacy: Edit[] = [];
+
+    // ---------- byte-surgery pass ----------
+    try {
+      const result = await applyContentStreamEdits(
+        new Uint8Array(workingBytes),
+        editPairs.map((p) => p.request)
+      );
+
+      // Pair each outcome with its source edit (same order).
+      result.outcomes.forEach((outcome, i) => {
+        if (outcome.status === 'tj-surgery') {
+          appliedByteSurgery++;
+        } else {
+          needsLegacy.push(editPairs[i].edit);
+        }
+      });
+
+      if (appliedByteSurgery > 0 && result.modified) {
+        workingBytes = Buffer.from(result.outputBytes);
+      }
+
+      if (needsLegacy.length > 0) {
+        const summary = result.outcomes
+          .filter((o) => o.status !== 'tj-surgery')
+          .reduce<Record<string, number>>((acc, o) => {
+            acc[o.status] = (acc[o.status] ?? 0) + 1;
+            return acc;
+          }, {});
+        log(
+          `byte-surgery: ${appliedByteSurgery}/${editPairs.length} applied in-place; ${needsLegacy.length} need legacy fallback`,
+          summary
+        );
+        // Per-edit detail so we can see exactly what's blocking byte-surgery
+        // — the summary above only counts statuses; the reason string holds
+        // the actual diagnostic (missing chars, font name, confidence).
+        result.outcomes.forEach((o, i) => {
+          if (o.status !== 'tj-surgery') {
+            const target = editPairs[i].request.target.text;
+            const newText = editPairs[i].request.newText;
+            log(
+              `  · edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.status}` +
+                (o.reason ? ` (${o.reason})` : '') +
+                (o.confidence !== undefined ? ` [confidence=${o.confidence.toFixed(2)}]` : '')
+            );
+          }
+        });
+      } else {
+        log(
+          `byte-surgery: applied ${appliedByteSurgery}/${editPairs.length} edits in-place; original Tj operands replaced byte-for-byte`
+        );
+        // Verbose: when an edit had a non-trivial path (multi-run), surface
+        // the strategy + run breakdown so we can verify visual fidelity.
+        result.outcomes.forEach((o, i) => {
+          if (o.status === 'tj-surgery' && o.reason) {
+            const target = editPairs[i].request.target.text;
+            const newText = editPairs[i].request.newText;
+            log(
+              `  ✓ edit "${truncate(target, 40)}" → "${truncate(newText, 40)}" :: ${o.reason}`
+            );
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[bakeTextEdits] content-stream pipeline threw — routing all edits to legacy fallback:', err);
+      needsLegacy = editPairs.map((p) => p.edit);
+    }
+
+    // ---------- legacy fallback for the residual edits ----------
+    if (needsLegacy.length === 0) {
+      return workingBytes;
+    }
+
+    // Write current bytes to a temp file so applyTextEditsToPDF can read them.
+    // We keep the tmp file around only long enough to round-trip through pdf-lib.
+    const inputTmp = path.join(
+      os.tmpdir(),
+      `pdf-textedit-bake-in-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
+    );
+    const outputTmp = path.join(
+      os.tmpdir(),
+      `pdf-textedit-bake-out-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
+    );
+    try {
+      await fs.writeFile(inputTmp, workingBytes);
+      await this.applyTextEditsToPDF(inputTmp, needsLegacy, outputTmp);
+      return await fs.readFile(outputTmp);
+    } finally {
+      await fs.unlink(inputTmp).catch(() => undefined);
+      await fs.unlink(outputTmp).catch(() => undefined);
+    }
   }
 
   async exportPageToImage(_filePath: string, _pageNumber: number, _format: string, _dpi: number): Promise<string> {
@@ -383,12 +679,15 @@ export class PDFService {
     outputPath: string
   ): Promise<void> {
     try {
-      // If there are text edits, apply them first via mupdf (Foxit-style),
-      // then feed the result into pdf-lib for other modifications.
+      // Apply text edits via the hybrid bake (byte-surgery first, legacy
+      // fallback) so the saved PDF gets the same fidelity as the live
+      // preview. Output goes through a temp file so the rest of the
+      // pdf-lib pipeline can layer overlays on top.
       let sourceFilePath = filePath;
       if (modifications.textEdits && modifications.textEdits.length > 0) {
         const tmpPath = path.join(os.tmpdir(), `pdf-textedit-${Date.now()}.pdf`);
-        await this.applyTextEditsToPDF(filePath, modifications.textEdits, tmpPath);
+        const bakedBytes = await this.bakeTextEdits(filePath, modifications.textEdits);
+        await fs.writeFile(tmpPath, bakedBytes);
         sourceFilePath = tmpPath;
       }
 

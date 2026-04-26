@@ -15,7 +15,8 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }));
 
-// Mock HTMLCanvasElement.getContext
+// Mock HTMLCanvasElement.getContext (skipped under Node-environment tests)
+if (typeof HTMLCanvasElement !== 'undefined') {
 HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
   fillRect: vi.fn(),
   clearRect: vi.fn(),
@@ -42,9 +43,10 @@ HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
   rect: vi.fn(),
   clip: vi.fn(),
 });
+}
 
-// Mock Electron API
-global.window = global.window || {};
+// Mock Electron API (only in browser-like environments)
+if (typeof window !== 'undefined') {
 (global.window as any).electronAPI = {
   openFile: vi.fn(),
   saveFile: vi.fn(),
@@ -63,6 +65,7 @@ global.window = global.window || {};
   saveAnnotations: vi.fn(),
   loadAnnotations: vi.fn(),
 };
+}
 
 // Mock pdf.js
 vi.mock('pdfjs-dist', () => ({

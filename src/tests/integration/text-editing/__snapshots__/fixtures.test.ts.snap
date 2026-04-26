@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`visual-regression hash > force-kerned edit (whitespace partition) produces a stable hash 1`] = `
+{
+  "height": 198,
+  "sha": "f511d2d87f9be9273a50d19edbb91512a83772bca98e1feb3ef7127f0df0bfef",
+  "width": 153,
+}
+`;
+
+exports[`visual-regression hash > hex-string Tj edit produces a stable hash 1`] = `
+{
+  "height": 198,
+  "sha": "06322b50e5fcb5c92c6cd700e21d6f55959ebb8a3f0a8b594c5a21ac9afde8f1",
+  "width": 153,
+}
+`;
+
+exports[`visual-regression hash > simple Helvetica edit produces a stable rendered hash 1`] = `
+{
+  "height": 198,
+  "sha": "f27f964c03ed36694d818fca6bcd291011074fc64fcda663ce817452b273538a",
+  "width": 153,
+}
+`;

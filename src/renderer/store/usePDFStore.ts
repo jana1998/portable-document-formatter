@@ -32,6 +32,10 @@ interface PDFState {
   // Text edits (Foxit-style in-place editing)
   textEdits: Map<number, TextEdit[]>;
   selectedTextEditId: string | null;
+  // Snapshot of textEdits that are baked into the currently-rendered PDF
+  // (id → newText). When an entry matches the current edit's newText, the
+  // overlay can hide its visible mask because pdf.js already shows the new text.
+  bakedSnapshot: Map<string, string>;
 
   // Search
   searchQuery: string;
@@ -41,10 +45,6 @@ interface PDFState {
   // OCR
   ocrResults: Map<number, OCRResult>;
   isProcessingOCR: boolean;
-
-  // Semantic (page embeddings from @huggingface/transformers MiniLM, 384-dim)
-  pageEmbeddings: Map<number, number[]>;
-  isIndexingEmbeddings: boolean;
 
   // UI state
   currentTool: string;
@@ -85,6 +85,7 @@ interface PDFState {
   updateTextEdit: (id: string, data: Partial<TextEdit>) => void;
   deleteTextEdit: (id: string) => void;
   setSelectedTextEditId: (id: string | null) => void;
+  setBakedSnapshot: (snapshot: Map<string, string>) => void;
 
   setSearchQuery: (query: string) => void;
   setSearchResults: (results: SearchResult[]) => void;
@@ -93,11 +94,6 @@ interface PDFState {
   setOCRResult: (pageNumber: number, result: OCRResult) => void;
   hydrateOCRResults: (results: OCRResult[]) => void;
   setIsProcessingOCR: (isProcessing: boolean) => void;
-
-  setPageEmbedding: (pageNumber: number, vector: number[]) => void;
-  hydratePageEmbeddings: (entries: Array<{ pageNumber: number; vector: number[] }>) => void;
-  clearPageEmbeddings: () => void;
-  setIsIndexingEmbeddings: (isIndexing: boolean) => void;
 
   setCurrentTool: (tool: string) => void;
   setIsSidebarOpen: (isOpen: boolean) => void;
@@ -128,13 +124,12 @@ const initialState = {
   selectedImageElementId: null,
   textEdits: new Map(),
   selectedTextEditId: null,
+  bakedSnapshot: new Map(),
   searchQuery: '',
   searchResults: [],
   currentSearchResultIndex: 0,
   ocrResults: new Map(),
   isProcessingOCR: false,
-  pageEmbeddings: new Map(),
-  isIndexingEmbeddings: false,
   currentTool: 'select',
   isSidebarOpen: true,
   isToolbarCollapsed: false,
@@ -159,8 +154,22 @@ export const usePDFStore = create<PDFState>((set, get) => ({
       totalPages: doc?.pageCount || 0,
       ...(changingDoc
         ? {
-            pageEmbeddings: new Map<number, number[]>(),
+            // All editing state is per-document. Without clearing these,
+            // edits from PDF A would render on PDF B until the user
+            // force-reloaded.
             ocrResults: new Map<number, OCRResult>(),
+            bakedSnapshot: new Map<string, string>(),
+            textEdits: new Map<number, TextEdit[]>(),
+            annotations: new Map<number, Annotation[]>(),
+            textElements: new Map<number, TextElement[]>(),
+            imageElements: new Map<number, ImageElement[]>(),
+            selectedAnnotationId: null,
+            selectedTextElementId: null,
+            selectedImageElementId: null,
+            selectedTextEditId: null,
+            searchQuery: '',
+            searchResults: [],
+            currentSearchResultIndex: 0,
           }
         : {}),
     });
@@ -296,6 +305,8 @@ export const usePDFStore = create<PDFState>((set, get) => ({
 
   setSelectedTextEditId: (id) => set({ selectedTextEditId: id }),
 
+  setBakedSnapshot: (snapshot) => set({ bakedSnapshot: snapshot }),
+
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchResults: (results) => set({ searchResults: results }),
   setCurrentSearchResultIndex: (index) => set({ currentSearchResultIndex: index }),
@@ -313,22 +324,6 @@ export const usePDFStore = create<PDFState>((set, get) => ({
   },
 
   setIsProcessingOCR: (isProcessing) => set({ isProcessingOCR: isProcessing }),
-
-  setPageEmbedding: (pageNumber, vector) => {
-    const pageEmbeddings = new Map(get().pageEmbeddings);
-    pageEmbeddings.set(pageNumber, vector);
-    set({ pageEmbeddings });
-  },
-
-  hydratePageEmbeddings: (entries) => {
-    const pageEmbeddings = new Map<number, number[]>();
-    for (const e of entries) pageEmbeddings.set(e.pageNumber, e.vector);
-    set({ pageEmbeddings });
-  },
-
-  clearPageEmbeddings: () => set({ pageEmbeddings: new Map() }),
-
-  setIsIndexingEmbeddings: (isIndexing) => set({ isIndexingEmbeddings: isIndexing }),
 
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setIsSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),

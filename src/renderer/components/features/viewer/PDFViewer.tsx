@@ -8,8 +8,30 @@ import { TextEditLayer } from '@components/features/editing/TextEditLayer';
 import { SearchHighlightLayer } from '@components/features/search/SearchHighlightLayer';
 import { TextBoxTool } from '@components/features/editing/TextBoxTool';
 import { ImageInsertTool } from '@components/features/editing/ImageInsertTool';
+import type { TextEdit } from '@renderer/types';
 
 const pdfRenderer = new PDFRenderer();
+
+// Compute a stable key over textEdits so we know when to re-bake.
+function editsSignature(textEdits: Map<number, TextEdit[]>): string {
+  const flat: string[] = [];
+  textEdits.forEach((pageEdits) =>
+    pageEdits.forEach((e) => {
+      if (e.newText !== e.originalText) flat.push(`${e.id}:${e.newText}`);
+    })
+  );
+  return flat.sort().join('|');
+}
+
+function flattenEdits(textEdits: Map<number, TextEdit[]>): TextEdit[] {
+  const out: TextEdit[] = [];
+  textEdits.forEach((pageEdits) =>
+    pageEdits.forEach((e) => {
+      if (e.newText !== e.originalText) out.push(e);
+    })
+  );
+  return out;
+}
 
 export function PDFViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,12 +40,15 @@ export function PDFViewer() {
   const [textBoxDialogOpen, setTextBoxDialogOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
+  const lastBakedSignature = useRef<string>('');
   const {
     currentDocument,
     currentPage,
     scale,
     rotation,
     currentTool,
+    textEdits,
+    setBakedSnapshot,
     setCurrentDocument,
     setIsLoading: setStoreLoading,
     setError,
@@ -32,6 +57,7 @@ export function PDFViewer() {
   useEffect(() => {
     if (currentDocument) {
       setIsDocumentReady(false);
+      lastBakedSignature.current = '';
       void loadDocument();
     }
 
@@ -46,6 +72,59 @@ export function PDFViewer() {
       void renderPage();
     }
   }, [currentPage, scale, rotation, isDocumentReady]);
+
+  // Re-bake committed text edits into the rendered PDF (Option B).
+  // Debounced so rapid edits coalesce. Skips while user is actively typing
+  // (we only bake after a commit that landed in the store).
+  useEffect(() => {
+    if (!currentDocument || !isDocumentReady) return;
+    const signature = editsSignature(textEdits);
+    if (signature === lastBakedSignature.current) return;
+
+    let cancelled = false;
+    const handle = window.setTimeout(async () => {
+      try {
+        const flat = flattenEdits(textEdits);
+        const sourceData = await window.electronAPI.readFile(currentDocument.path);
+        const sourceBytes = sourceData instanceof ArrayBuffer
+          ? sourceData
+          : sourceData.buffer.slice(sourceData.byteOffset, sourceData.byteOffset + sourceData.byteLength);
+
+        const renderBytes: ArrayBuffer = flat.length === 0
+          ? sourceBytes
+          : await (async () => {
+              const baked = await window.electronAPI.bakeTextEdits(currentDocument.path, flat);
+              return baked instanceof ArrayBuffer
+                ? baked
+                : baked.buffer.slice(baked.byteOffset, baked.byteOffset + baked.byteLength);
+            })();
+
+        if (cancelled) return;
+
+        // Reload pdf.js with the new bytes (clones, since pdf.js takes ownership).
+        await pdfRenderer.loadDocument(renderBytes.slice(0));
+        if (cancelled) return;
+
+        // Mark which edits are now "in" the rendered PDF so the overlay knows
+        // it can drop the white-mask + faux-text for those entries.
+        const snapshot = new Map<string, string>();
+        flat.forEach((e) => snapshot.set(e.id, e.newText));
+        setBakedSnapshot(snapshot);
+        lastBakedSignature.current = signature;
+
+        if (canvasRef.current) {
+          await pdfRenderer.renderPage(currentPage, canvasRef.current, scale, rotation);
+        }
+      } catch (err) {
+        if (!cancelled) console.warn('bakeTextEdits failed:', err);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [textEdits, currentDocument?.path, isDocumentReady]);
 
   const loadDocument = async () => {
     if (!currentDocument) return;

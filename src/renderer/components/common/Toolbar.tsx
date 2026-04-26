@@ -4,7 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@components/ui/tooltip'
 import { FileText, FileUp, Moon, PanelLeft, PanelLeftClose, Save, Settings, Sun } from 'lucide-react';
 import { usePDFStore } from '@renderer/store/usePDFStore';
 import { SaveDialog } from '@components/features/pages/SaveDialog';
-import { ensureEmbeddingsForDocument } from '@renderer/services/embeddings-indexer';
 import { formatFileSize, formatRelativeTime } from '@renderer/lib/utils';
 
 const isCompanionClient = (): boolean =>
@@ -50,7 +49,6 @@ export function Toolbar() {
         console.warn('OCR sidecar load failed:', ocrErr);
       }
 
-      void ensureEmbeddingsForDocument(fileInfo.path);
     } catch (error) {
       console.error('Failed to open file:', error);
     }

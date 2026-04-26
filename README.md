@@ -176,7 +176,6 @@ Built with modern, production-ready technologies:
 | 📝 **pdf-lib** | PDF manipulation and creation |
 | 📐 **mupdf** | Structured text extraction for in-place editing |
 | 🤖 **PaddleOCR (`@gutenye/ocr-node`)** | OCR text extraction in a `utilityProcess` |
-| 🧠 **`@huggingface/transformers`** | On-device embeddings (MiniLM) and LLM (SmolLM2) |
 | 🐻 **Zustand** | Lightweight state management |
 | 🌐 **Node `http` + `qrcode`** | Mobile companion server + QR pairing |
 | ⚡ **Vite** | Lightning-fast build tool |
@@ -256,8 +255,7 @@ portable-document-formatter/
 - [x] Thumbnail navigation
 - [x] In-place text editing via mupdf structured-text extraction
 - [x] PaddleOCR pipeline running in an Electron `utilityProcess`
-- [x] On-device semantic search using MiniLM embeddings + sidecar caching
-- [x] On-device LLM (SmolLM2) via Hugging Face Transformers — streaming IPC
+- [x] On-device LLM scaffold — streaming IPC wired, provider interface ready
 - [x] Mobile Companion — LAN HTTP server + QR pairing, edit & save from phone
 - [x] Welcome screen with drag-and-drop onboarding (`WelcomeHero`)
 - [x] Mobile library file picker (`LibraryPicker`)

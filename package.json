@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@gutenye/ocr-node": "^1.4.8",
-    "@huggingface/transformers": "^4.2.0",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-select": "^2.0.0",
@@ -96,7 +95,8 @@
       "package.json",
       "!node_modules/canvas{,/**/*}",
       "!src/**/*",
-      "!dist/**/*.map"
+      "!dist/**/*.map",
+      "!node_modules/pdfjs-dist/legacy{,/**/*}"
     ],
     "asarUnpack": [
       "node_modules/onnxruntime-node/**",
@@ -118,6 +118,10 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "public/icon.png",
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v6/linux{,/**/*}",
+        "!node_modules/onnxruntime-node/bin/napi-v6/win32{,/**/*}"
+      ],
       "target": [
         {
           "target": "dmg",
@@ -129,6 +133,10 @@
     },
     "win": {
       "icon": "public/icon.png",
+      "files": [
+        "!node_modules/onnxruntime-node/bin/napi-v6/darwin{,/**/*}",
+        "!node_modules/onnxruntime-node/bin/napi-v6/linux{,/**/*}"
+      ],
       "target": [
         {
           "target": "nsis",

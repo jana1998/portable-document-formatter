@@ -134,6 +134,7 @@ export interface TextEdit {
   fontFamily: string;
   fontWeight: string;
   fontStyle: string;
+  color: string; // #rrggbb captured from the original text
 }
 
 export type TextEditLineInfo = {
@@ -146,6 +147,7 @@ export type TextEditLineInfo = {
     style: string;
     size: number;
   };
+  color: string; // #rrggbb
 };
 
 export interface ExportOptions {

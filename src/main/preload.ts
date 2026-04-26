@@ -28,6 +28,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAnnotations: (filePath: string, annotations: any) => ipcRenderer.invoke('annotations:save', filePath, annotations),
   loadAnnotations: (filePath: string) => ipcRenderer.invoke('annotations:load', filePath),
 
+  // Bake committed text edits into a temp PDF and return the modified bytes.
+  // The renderer feeds these back into pdf.js so committed edits render natively
+  // (matches the original PDF font/spacing) instead of relying on the overlay.
+  bakeTextEdits: (filePath: string, textEdits: unknown) =>
+    ipcRenderer.invoke('pdf:bakeTextEdits', filePath, textEdits),
+
+  // Phase 4a — locate the content-stream operator(s) producing a given line.
+  // Read-only diagnostic; used by TextEditLayer to log which Tj/TJ a click maps to.
+  locateTextEdit: (
+    filePath: string,
+    pageNumber: number,
+    target: { bbox: { x: number; y: number; w: number; h: number }; text: string; fontSize?: number }
+  ) => ipcRenderer.invoke('pdf:locateTextEdit', filePath, pageNumber, target),
+
   // Apply all modifications
   applyModifications: (filePath: string, modifications: any, outputPath: string) => ipcRenderer.invoke('pdf:applyModifications', filePath, modifications, outputPath),
 
@@ -44,17 +58,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ocr:exportPDF', outputPath, text),
   writeTextFile: (filePath: string, content: string) =>
     ipcRenderer.invoke('file:writeText', filePath, content),
-
-  // Embeddings (all-MiniLM-L6-v2, main-process utilityProcess)
-  embedDocument: (
-    pdfPath: string,
-    pages: Array<{ pageNumber: number; text: string }>
-  ) => ipcRenderer.invoke('embeddings:embedDocument', pdfPath, pages),
-  embedText: (text: string) => ipcRenderer.invoke('embeddings:embedText', text),
-  saveEmbeddingsSidecar: (pdfPath: string, embeddings: unknown) =>
-    ipcRenderer.invoke('embeddings:saveSidecar', pdfPath, embeddings),
-  loadEmbeddingsSidecar: (pdfPath: string) =>
-    ipcRenderer.invoke('embeddings:loadSidecar', pdfPath),
 
   // LLM — local-only backend, streams chunks via on* subscriptions.
   llmGenerate: (prompt: string, options: unknown) =>
@@ -108,9 +111,40 @@ declare global {
         text: string;
         bbox: { x: number; y: number; w: number; h: number };
         font: { name: string; family: string; weight: string; style: string; size: number };
+        color: string;
       }[]>;
       saveAnnotations: (filePath: string, annotations: any) => Promise<string>;
       loadAnnotations: (filePath: string) => Promise<any>;
+      bakeTextEdits: (filePath: string, textEdits: unknown) => Promise<Uint8Array>;
+      locateTextEdit: (
+        filePath: string,
+        pageNumber: number,
+        target: { bbox: { x: number; y: number; w: number; h: number }; text: string; fontSize?: number }
+      ) => Promise<{
+        runs: Array<{
+          text: string;
+          operator: 'Tj' | 'TJ' | "'" | '"';
+          opStart: number;
+          opEnd: number;
+          operandStart?: number;
+          operandEnd?: number;
+          isHex?: boolean;
+          fontResourceName: string;
+          fontSize: number;
+          fillColor: { r: number; g: number; b: number };
+          strokeColor: { r: number; g: number; b: number };
+          inXObject: boolean;
+          tjArray?: Array<
+            | { kind: 'string'; text: string; operandStart: number; operandEnd: number; isHex: boolean }
+            | { kind: 'kern'; value: number }
+          >;
+        }>;
+        confidence: number;
+        reason?: string;
+        contentStreamSize: number;
+        pageWidth: number;
+        pageHeight: number;
+      } | null>;
       applyModifications: (filePath: string, modifications: any, outputPath: string) => Promise<boolean>;
       recognizePageImage: (
         pageNumber: number,
@@ -145,15 +179,6 @@ declare global {
       ) => Promise<string | null>;
       exportOCRPDF: (outputPath: string, text: string) => Promise<void>;
       writeTextFile: (filePath: string, content: string) => Promise<void>;
-      embedDocument: (
-        pdfPath: string,
-        pages: Array<{ pageNumber: number; text: string }>
-      ) => Promise<Array<{ pageNumber: number; vector: number[] }>>;
-      embedText: (text: string) => Promise<number[] | null>;
-      saveEmbeddingsSidecar: (pdfPath: string, embeddings: unknown) => Promise<string>;
-      loadEmbeddingsSidecar: (
-        pdfPath: string
-      ) => Promise<Array<{ pageNumber: number; vector: number[] }> | null>;
       llmGenerate: (
         prompt: string,
         options: {

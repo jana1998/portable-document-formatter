@@ -118,6 +118,10 @@ function buildShim(): Window['electronAPI'] {
     addImageToPDF: NOT_AVAILABLE('addImageToPDF'),
     exportToImage: NOT_AVAILABLE('exportToImage'),
     extractText: NOT_AVAILABLE('extractText'),
+    // bakeTextEdits is desktop-only; mobile renders the original PDF.
+    bakeTextEdits: NOT_AVAILABLE('bakeTextEdits'),
+    // locateTextEdit is the Phase 4a diagnostic; not exposed to mobile.
+    locateTextEdit: () => Promise.resolve(null),
 
     // Annotations sidecar
     saveAnnotations: async (filePath: string, annotations: unknown) => {
@@ -151,7 +155,7 @@ function buildShim(): Window['electronAPI'] {
       return true;
     },
 
-    // OCR / embeddings / LLM — out of v1 scope. Stubs keep existing renderer
+    // OCR / LLM — out of v1 scope. Stubs keep existing renderer
     // code paths from crashing when they fire on document open.
     recognizePageImage: NOT_AVAILABLE('recognizePageImage'),
     cancelOCR: () => Promise.resolve(false),
@@ -160,10 +164,6 @@ function buildShim(): Window['electronAPI'] {
     saveTextFile: NOT_AVAILABLE('saveTextFile'),
     exportOCRPDF: NOT_AVAILABLE('exportOCRPDF'),
     writeTextFile: NOT_AVAILABLE('writeTextFile'),
-    embedDocument: () => Promise.resolve([]),
-    embedText: () => Promise.resolve(null),
-    saveEmbeddingsSidecar: () => Promise.resolve(''),
-    loadEmbeddingsSidecar: () => Promise.resolve(null),
     llmGenerate: NOT_AVAILABLE('llmGenerate'),
     llmCancel: () => Promise.resolve(false),
     onLLMChunk: () => () => undefined,

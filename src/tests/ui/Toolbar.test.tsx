@@ -20,8 +20,6 @@ vi.mock('@renderer/store/usePDFStore', () => ({
     isSidebarOpen: true,
     currentTool: 'select',
     ocrResults: new Map(),
-    pageEmbeddings: new Map(),
-    isIndexingEmbeddings: false,
     setCurrentPage: vi.fn(),
     setScale: vi.fn(),
     setIsSidebarOpen: vi.fn(),
